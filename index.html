@@ -1,0 +1,2706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Operations1 — Visibility logic prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #eef0f7;
+    --surface: #ffffff;
+    --surface-2: #f7f9fc;
+    --border: #e3e6ee;
+    --border-strong: #cfd4e0;
+    --text: #1c2330;
+    --text-mute: #6a7282;
+    --text-soft: #8a93a3;
+    --primary: #216BFF;
+    --primary-soft: #e2ecff;
+    --primary-strong: #154fd1;
+    --green-bg: #d6f5e2;
+    --green-text: #1b6f3b;
+    --green-strong: #6dd394;
+    --purple-bg: #e1dbff;
+    --purple-text: #4a3aaa;
+    --red-bg: #fde2e2;
+    --red-text: #b53636;
+    --amber-bg: #fff3d6;
+    --amber-text: #8a6500;
+    --gray-bg: #ececf0;
+    --gray-text: #4a4f5c;
+    --inherited-bg: #fde8d2;
+    --inherited-text: #a25a00;
+    --shadow-card: 0 1px 2px rgba(20, 30, 60, 0.04), 0 2px 8px rgba(20, 30, 60, 0.04);
+    --shadow-drawer: -8px 0 24px rgba(20, 30, 60, 0.08);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: var(--text); background: var(--bg); font-size: 14px; line-height: 1.4; }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+  input, select, textarea { font-family: inherit; color: inherit; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary) !important; box-shadow: 0 0 0 3px rgba(33, 107, 255, 0.18); }
+  input[type="checkbox"]:focus, input[type="radio"]:focus { outline: 2px solid var(--primary); outline-offset: 2px; box-shadow: none; }
+  a { color: var(--primary); text-decoration: none; cursor: pointer; }
+
+  /* ===== App shell ===== */
+  .app { min-height: 100vh; display: flex; flex-direction: column; }
+  .topbar { background: var(--surface); padding: 14px 28px 0; border-bottom: 1px solid var(--border); }
+  .topbar-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .topbar-title-block .crumb { font-size: 11px; letter-spacing: 1px; color: var(--text-mute); font-weight: 600; margin-bottom: 2px; }
+  .topbar-title-block h1 { margin: 0; font-size: 24px; font-weight: 700; }
+  .topbar-actions { display: flex; align-items: center; gap: 12px; }
+  .kebab { width: 32px; height: 32px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-mute); }
+  .kebab:hover { background: var(--bg); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 13px; border: 1px solid transparent; transition: background .12s, color .12s, border-color .12s; }
+  .btn-ghost { background: transparent; color: var(--text); border-color: var(--border-strong); }
+  .btn-ghost:hover { background: var(--bg); }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-strong); }
+  .btn-primary.btn-danger { background: #d83b3b; }
+  .btn-primary.btn-danger:hover { background: #b62a2a; }
+  .btn-link { color: var(--primary); padding: 6px 8px; font-weight: 600; }
+
+  .tabs-row { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; }
+  .tabs { display: flex; gap: 4px; }
+  .tab { padding: 10px 14px; font-size: 14px; font-weight: 500; color: var(--text-mute); border-bottom: 2px solid transparent; cursor: pointer; }
+  .tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+  .tab:hover:not(.active) { color: var(--text); }
+  .tabs-meta { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-mute); padding-bottom: 6px; }
+  .meta-pill { background: var(--bg); padding: 4px 10px; border-radius: 6px; font-weight: 600; color: var(--text); font-size: 12px; }
+  .meta-lang { background: var(--green-bg); color: var(--green-text); padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 12px; display: flex; align-items: center; gap: 4px; }
+
+  /* ===== Content ===== */
+  .content { flex: 1; padding: 0; overflow: hidden; }
+  .steps-layout { display: grid; grid-template-columns: 260px 1fr; gap: 0; height: calc(100vh - 130px); }
+  .steps-sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 16px 12px; overflow-y: auto; }
+  .add-step-btn { width: 100%; padding: 10px; border: 1px dashed var(--primary); border-radius: 8px; color: var(--primary); font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .add-step-btn:hover { background: var(--primary-soft); }
+  .preview-btn { width: 100%; padding: 10px; margin-top: 8px; border: 1px solid var(--primary); border-radius: 8px; color: var(--primary); font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; background: white; }
+  .preview-btn:hover { background: var(--primary-soft); }
+
+  .resize-handle { display: flex; justify-content: center; padding: 6px 0; color: var(--primary); }
+
+  .step-list { margin-top: 24px; display: flex; flex-direction: column; gap: 2px; }
+  .step-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--text); position: relative; }
+  .step-item:hover { background: var(--bg); }
+  .step-item.active { background: var(--primary-soft); color: var(--text); font-weight: 500; }
+  .step-num { width: 22px; text-align: center; color: var(--text-mute); font-weight: 500; }
+  .step-item.active .step-num { color: var(--primary); font-weight: 700; }
+  .step-title-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .step-kebab { opacity: 0; color: var(--text-mute); padding: 4px; border-radius: 4px; }
+  .step-item:hover .step-kebab,
+  .step-item .step-kebab.active { opacity: 1; }
+  .step-kebab:hover { background: rgba(20,30,60,.06); }
+
+  .module-block { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin: 8px 0; cursor: pointer; }
+  .module-block:hover { background: var(--bg); }
+  .module-block.active { background: var(--primary-soft); border-color: var(--primary); }
+  .module-header { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); position: relative; }
+  .module-header-icon { color: var(--text-mute); }
+  .module-title { flex: 1; font-weight: 500; }
+  .module-step-item { margin-top: 8px; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--text); background: white; border: 1px solid var(--border); }
+  .module-step-item:hover { background: var(--bg); }
+  .module-block.active .module-step-item { background: white; border-color: var(--primary); }
+  .module-step-item .step-num { color: var(--text-mute); font-weight: 500; }
+  .module-block.active .module-step-item .step-num { color: var(--primary); font-weight: 700; }
+  .module-step-item .step-kebab { opacity: 0; color: var(--text-mute); }
+  .module-step-item:hover .step-kebab { opacity: 1; }
+  .module-version { margin-top: 8px; }
+  .module-version-select { width: 100%; padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: white; font-size: 13px; display: flex; align-items: center; justify-content: space-between; }
+
+  /* ===== Steps main pane ===== */
+  .steps-main { padding: 22px 28px 140px; overflow-y: auto; background: var(--bg); }
+  .step-header-card { background: var(--surface); border-radius: 10px; padding: 14px 18px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-card); margin-bottom: 16px; }
+  .module-banner { background: linear-gradient(0deg, rgba(47,107,255,0.06), rgba(47,107,255,0.06)), white; border: 1px solid var(--primary-soft); border-radius: 10px; padding: 12px 18px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }
+  .module-banner-icon { display: inline-flex; align-items: center; margin-right: 6px; vertical-align: middle; color: var(--primary); }
+  .module-banner-version { color: var(--text-mute); margin-left: 8px; font-weight: 400; font-size: 12px; }
+  .module-banner-ro { background: var(--primary-soft); color: var(--primary-strong); padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: .4px; }
+  .module-step-wrap { position: relative; }
+  .module-step-wrap .step-title-input,
+  .module-step-wrap .ps-title-input,
+  .module-step-wrap .interaction-row,
+  .module-step-wrap .ps-attach,
+  .module-step-wrap .interaction-list { pointer-events: none; }
+  .module-step-wrap .vis-tag { pointer-events: auto; }
+  .module-step-wrap .kebab { pointer-events: auto; }
+  .step-title-input { flex: 1; border: none; outline: none; font-size: 16px; font-weight: 600; padding: 4px 6px; background: transparent; }
+  .step-title-input:focus { background: var(--bg); border-radius: 6px; }
+
+  .process-step-card { background: var(--surface); border-radius: 10px; padding: 0; margin-bottom: 18px; box-shadow: var(--shadow-card); }
+  .ps-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; }
+  .ps-num { width: 26px; height: 26px; border-radius: 6px; background: var(--primary-soft); color: var(--primary); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+  .ps-title-input { flex: 1; padding: 8px 12px; border: 1px solid transparent; background: var(--surface-2); border-radius: 6px; font-weight: 500; font-size: 14px; }
+  .ps-title-input:focus { outline: none; border-color: var(--primary); background: white; }
+
+  .ps-attach { padding: 0 18px 12px; }
+  .ps-attach-empty { border: 1px dashed var(--border-strong); border-radius: 8px; padding: 14px; text-align: center; color: var(--text-mute); font-size: 13px; }
+  .ps-attach-files { display: flex; gap: 10px; padding: 4px 0; }
+  .file-thumb { width: 78px; height: 60px; border-radius: 8px; background-size: cover; background-position: center; position: relative; overflow: hidden; border: 1px solid var(--border); }
+  .file-thumb-label { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(20,20,40,.55); color: white; font-size: 10px; padding: 2px 4px; display: flex; align-items: center; gap: 3px; }
+  .file-thumb-kebab { position: absolute; top: 4px; right: 4px; background: rgba(255,255,255,.85); width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #333; font-weight: 700; font-size: 11px; }
+
+  .interaction-list { display: flex; flex-direction: column; gap: 8px; padding: 4px 18px 12px; }
+  .interaction-row { display: flex; align-items: center; gap: 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .interaction-row.expanded { flex-direction: column; align-items: stretch; }
+  .interaction-row-main { display: flex; align-items: center; gap: 10px; width: 100%; }
+  .interaction-icon { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-mute); flex-shrink: 0; }
+  .interaction-label { flex: 1; font-size: 13px; }
+  .interaction-controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .checkbox-pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--text-mute); cursor: pointer; user-select: none; }
+  .checkbox-pill input { margin: 0; cursor: pointer; }
+  .checkbox-pill.checked { color: var(--text); }
+  .checkbox-pill.checked-purple { background: var(--purple-bg); color: var(--purple-text); }
+  .chev { color: var(--text-mute); padding: 4px; border-radius: 4px; }
+  .chev:hover { background: var(--bg); }
+
+  .interaction-expanded-body { width: 100%; padding-top: 8px; padding-left: 34px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+  .resp-row { display: flex; align-items: center; gap: 16px; }
+  .resp-row label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+  .resp-row .resp-key { color: var(--text-mute); width: 80px; }
+  .add-tag-link { color: var(--primary); font-weight: 600; padding: 6px 0; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; letter-spacing: .5px; }
+
+  .add-ps-row { display: flex; align-items: center; gap: 10px; padding: 4px 18px 16px; }
+  .add-ps-line { flex: 1; height: 1px; background: var(--border); }
+  .add-ps-btn { color: var(--primary); font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; letter-spacing: .3px; }
+
+  .block-nav-row { padding: 8px 18px 16px; display: flex; align-items: center; gap: 12px; color: var(--text-mute); font-size: 13px; }
+  .block-nav-row label { display: inline-flex; align-items: center; gap: 6px; line-height: 1; }
+  .block-nav-row input[type="radio"], .block-nav-row input[type="checkbox"] { margin: 0; }
+  .info-bullet { width: 16px; height: 16px; border-radius: 50%; background: var(--text-mute); color: white; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
+
+  /* ===== Visibility tag ===== */
+  .vis-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; user-select: none; color: var(--text-mute); }
+  .vis-tag:hover { background: var(--bg); }
+  .vis-tag.always { color: var(--text-mute); }
+  .vis-tag.conditional { background: var(--green-bg); color: var(--green-text); }
+  .vis-tag.inherited { background: var(--inherited-bg); color: var(--inherited-text); }
+  .vis-tag.governed { background: var(--purple-bg); color: var(--purple-text); }
+  .vis-tag .count { font-weight: 700; }
+  .vis-tag svg { width: 14px; height: 14px; }
+  .vis-tag.always { position: relative; }
+  .vis-tag.always::after {
+    content: 'Always visible';
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1c2330;
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .12s;
+    z-index: 25;
+  }
+  .vis-tag.always::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #1c2330;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .12s;
+    z-index: 25;
+  }
+  .vis-tag.always:hover::after,
+  .vis-tag.always:hover::before { opacity: 1; }
+  .vis-tag.conditional { position: relative; }
+  .global-tooltip {
+    position: fixed;
+    top: 0;
+    left: 0;
+    background: #1c2330;
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 6px;
+    max-width: 300px;
+    white-space: normal;
+    line-height: 1.45;
+    text-align: left;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .12s;
+    z-index: 100;
+    box-shadow: 0 8px 24px rgba(20,30,60,.18);
+    transform: translate(-9999px, -9999px);
+  }
+  .global-tooltip.show { opacity: 1; }
+
+  /* ===== Drawer ===== */
+  .drawer-overlay { position: fixed; inset: 0; background: rgba(20,30,60,.18); display: none; z-index: 30; }
+  .drawer-overlay.show { display: block; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 420px; background: var(--surface); box-shadow: var(--shadow-drawer); transform: translateX(100%); transition: transform .25s; z-index: 31; display: flex; flex-direction: column; }
+  .drawer.show { transform: translateX(0); }
+  .drawer-header { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .drawer-header h3 { margin: 0; font-size: 16px; font-weight: 700; }
+  .drawer-header-actions { display: flex; align-items: center; gap: 8px; }
+  .drawer-body { flex: 1; overflow-y: auto; padding: 20px; }
+  .drawer-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; gap: 12px; color: var(--text-mute); }
+  .drawer-empty svg { color: var(--primary); }
+  .drawer-empty h4 { margin: 0; font-size: 16px; color: var(--text); font-weight: 600; }
+  .drawer-empty p { margin: 0; }
+
+  .drawer-top-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .drawer-top-row .danger-link { color: var(--red-text); font-size: 12px; font-weight: 700; letter-spacing: .5px; }
+
+  .class-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 8px; position: relative; transition: border-color .15s, background-color .15s; }
+  .class-card.not-show { border-color: #FBBFBF; background: #fff7f7; }
+  .class-card.locked { background: #fafbfd; }
+  .class-card.locked .class-card-select label { background: #fafbfd; color: var(--text-mute); }
+  .class-card.locked .class-card-select select { background-color: #f3f5fa; color: var(--text); cursor: not-allowed; }
+  .class-card.locked .class-card-notshow input { cursor: not-allowed; }
+  .class-card-row { display: flex; gap: 8px; align-items: flex-start; }
+  .class-card-select { flex: 1; position: relative; }
+  .class-card-select label { position: absolute; top: -7px; left: 10px; background: white; padding: 0 4px; font-size: 11px; line-height: 1; color: var(--text-mute); z-index: 2; }
+  .class-card-select select { width: 100%; padding: 12px 12px 8px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 13px; appearance: none; background: white url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236a7282' viewBox='0 0 16 16'><path d='M4 6l4 4 4-4'/></svg>") no-repeat right 8px center; }
+  .class-card-del { width: 36px; height: 36px; border-radius: 6px; color: var(--text-mute); display: inline-flex; align-items: center; justify-content: center; }
+  .class-card-del:hover { background: var(--bg); color: var(--red-text); }
+
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: white; border: 1px solid var(--border-strong); font-size: 12px; }
+  .chip-x { color: var(--text-mute); font-size: 14px; line-height: 1; cursor: pointer; }
+  .chip-x:hover { color: var(--red-text); }
+  .chip-op { font-size: 11px; color: var(--text-mute); font-weight: 600; padding: 0 2px; }
+  .add-classifier { color: var(--primary); font-weight: 600; font-size: 12px; padding: 6px 0; display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; letter-spacing: .5px; position: relative; cursor: pointer; }
+  .classifier-popover { position: absolute; top: 100%; left: 0; margin-top: 4px; background: white; border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 12px 28px rgba(20,30,60,.14); min-width: 240px; z-index: 32; display: flex; flex-direction: column; max-height: 260px; }
+  .classifier-popover-header { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--text-mute); letter-spacing: .4px; }
+  .classifier-popover-list { overflow-y: auto; padding: 4px 0; flex: 1; }
+  .classifier-popover-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; color: var(--text); font-weight: 500; }
+  .classifier-popover-item:hover { background: var(--bg); }
+  .classifier-popover-item input { margin: 0; cursor: pointer; }
+  .classifier-popover-empty { padding: 12px; text-align: center; color: var(--text-mute); font-size: 12px; font-style: italic; }
+  .classifier-popover-footer { padding: 8px 12px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
+  .class-card-notshow { margin-top: 10px; }
+  .class-card-notshow label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+
+  .operator-wrap { display: flex; flex-direction: column; align-items: center; padding: 4px 0; }
+  .operator-line { width: 1px; height: 12px; background: var(--green-strong); }
+  .operator-pill { background: var(--green-bg); color: var(--green-text); padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: .5px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; position: relative; }
+  .operator-popover { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 4px; background: white; border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 12px 28px rgba(20,30,60,.14); min-width: 180px; z-index: 32; display: flex; flex-direction: column; }
+  .operator-popover-header { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--text-mute); letter-spacing: .4px; }
+  .operator-popover-list { padding: 4px 0; }
+  .operator-popover-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 8px 12px; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; }
+  .operator-popover-item:hover { background: var(--bg); }
+  .operator-popover-item.selected { color: var(--green-text); background: var(--green-bg); font-weight: 600; }
+  .operator-popover-item .radio-dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--border-strong); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .operator-popover-item.selected .radio-dot { border-color: var(--green-strong); }
+  .operator-popover-item.selected .radio-dot::after { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--green-strong); }
+
+  .add-class-cond-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+  .add-class-cond-line { flex: 1; height: 1px; background: var(--border); }
+  .add-class-cond-btn { color: var(--primary); font-weight: 700; font-size: 11px; letter-spacing: .5px; display: inline-flex; align-items: center; gap: 4px; }
+
+  .summary-box { background: #e8efff; border-radius: 10px; padding: 14px; margin-top: 12px; }
+  .summary-box h5 { margin: 0 0 6px; font-size: 13px; font-weight: 700; }
+  .summary-box p { margin: 0; font-size: 12px; color: var(--text); line-height: 1.5; }
+
+  .readonly-notice { background: var(--amber-bg); color: var(--amber-text); padding: 10px 12px; border-radius: 8px; font-size: 12px; margin-bottom: 12px; display: flex; align-items: flex-start; gap: 8px; }
+  .drawer.readonly .class-card-select select,
+  .drawer.readonly .chip-x,
+  .drawer.readonly .add-classifier,
+  .drawer.readonly .class-card-del,
+  .drawer.readonly .operator-pill,
+  .drawer.readonly .add-class-cond-btn,
+  .drawer.readonly .class-card-notshow input,
+  .drawer.readonly .drawer-top-row input,
+  .drawer.readonly .drawer-top-row .danger-link,
+  .drawer.readonly .drawer-header-actions .btn-primary { pointer-events: none; opacity: .55; }
+
+  /* ===== Info tab ===== */
+  .info-layout { padding: 22px 28px; max-width: 900px; margin: 0 auto; overflow-y: auto; height: calc(100vh - 130px); }
+  .info-card { background: var(--surface); border-radius: 10px; padding: 18px 20px; margin-bottom: 14px; box-shadow: var(--shadow-card); }
+  .info-card h4 { margin: 0 0 14px; font-size: 15px; font-weight: 600; }
+  .field-grid-2 { display: grid; grid-template-columns: 1fr 1fr; row-gap: 24px; column-gap: 12px; }
+  .field { position: relative; }
+  .field label { position: absolute; top: -8px; left: 10px; background: white; padding: 0 4px; font-size: 11px; color: var(--text-mute); }
+  .field input, .field select, .field textarea { width: 100%; padding: 12px 12px 10px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 13px; outline: none; background: white; }
+  .field.full { grid-column: 1 / -1; }
+  .field textarea { resize: vertical; min-height: 56px; }
+  .checks-row { display: flex; gap: 18px; margin-top: 24px; }
+  .checks-row label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+  .struct-classes-list, .inherited-list { display: flex; flex-direction: column; gap: 12px; }
+  .class-row { display: flex; align-items: center; gap: 8px; font-size: 13px; flex-wrap: wrap; }
+  .class-row .class-label { color: var(--text-mute); min-width: 80px; }
+  .add-icon-btn { width: 18px; height: 18px; border-radius: 4px; background: var(--bg); color: var(--text-mute); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; line-height: 1; padding: 0; position: relative; }
+  .add-icon-btn svg { width: 10px; height: 10px; }
+  .add-icon-btn:hover { background: var(--primary-soft); color: var(--primary); }
+  .add-icon-btn[data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1c2330;
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .12s;
+    z-index: 25;
+  }
+  .add-icon-btn[data-tip]::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 1px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #1c2330;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .12s;
+    z-index: 25;
+  }
+  .add-icon-btn[data-tip]:hover::after,
+  .add-icon-btn[data-tip]:hover::before { opacity: 1; }
+  .apply-all-row { text-align: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+  /* ===== Modules tab ===== */
+  .modules-layout { padding: 22px 28px; overflow-y: auto; height: calc(100vh - 130px); }
+  .modules-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; max-width: 1100px; margin: 0 auto; }
+  .module-card { background: var(--surface); border-radius: 10px; padding: 16px; box-shadow: var(--shadow-card); display: flex; flex-direction: column; gap: 8px; position: relative; }
+  .module-card h5 { margin: 0; font-size: 14px; font-weight: 600; }
+  .module-card .mute { color: var(--text-mute); font-size: 12px; }
+  .module-kebab { position: absolute; top: 10px; right: 10px; }
+  .module-menu { position: absolute; top: calc(100% + 6px); right: 0; background: white; border: 1px solid var(--border); border-radius: 8px; padding: 6px 0; min-width: 200px; box-shadow: 0 12px 28px rgba(20,30,60,.14); display: none; z-index: 20; }
+  .module-menu.above { top: auto; bottom: calc(100% + 6px); }
+  .module-menu.show { display: block; }
+  .module-menu button { display: block; width: 100%; text-align: left; padding: 8px 14px; font-size: 13px; }
+  .module-menu button:hover:not(:disabled) { background: var(--bg); }
+  .module-menu button:disabled { cursor: default; }
+
+  /* ===== Preview modal ===== */
+  .preview-modal-overlay { position: fixed; inset: 0; background: rgba(20,30,60,.4); display: none; z-index: 40; }
+  .preview-modal-overlay.show { display: flex; }
+  .preview-modal { margin: 24px auto; background: white; border-radius: 14px; width: calc(100% - 48px); max-width: 1300px; height: calc(100vh - 48px); display: grid; grid-template-columns: 1fr 320px; overflow: hidden; }
+  .preview-modal.classifiers-collapsed { grid-template-columns: 1fr; }
+  .preview-modal.classifiers-collapsed .preview-right { display: none; }
+  .preview-modal.classifiers-collapsed .preview-left { border-right: none; }
+  .preview-left { display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid var(--border); }
+  .preview-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+  .preview-header h3 { margin: 0; font-size: 16px; font-weight: 700; }
+  .preview-notice { background: var(--primary-soft); padding: 12px 16px; font-size: 13px; color: var(--text); display: flex; align-items: center; justify-content: space-between; }
+  .preview-notice .add-class-prompt { color: var(--primary); font-weight: 700; font-size: 12px; letter-spacing: .5px; }
+  .preview-body { flex: 1; overflow-y: auto; padding: 16px 20px; background: var(--surface-2); }
+  .preview-doc-title { font-size: 18px; font-weight: 700; margin: 8px 0 16px; }
+  .preview-ps { background: white; border-radius: 10px; padding: 14px; margin-bottom: 16px; box-shadow: var(--shadow-card); }
+  .preview-ps-title { display: flex; align-items: flex-start; gap: 10px; font-weight: 600; margin-bottom: 12px; line-height: 1.4; }
+  .preview-ps-title .ps-num { margin-top: 1px; }
+  .preview-interaction { border-left: 2px solid var(--border); padding: 8px 0 8px 14px; margin: 4px 0 4px 12px; }
+  .preview-interaction .label { font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .preview-interaction .label .tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+  .preview-interaction .tag-mandatory { background: var(--purple-bg); color: var(--purple-text); }
+  .preview-interaction .tag-critical { background: var(--red-bg); color: var(--red-text); }
+  .preview-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .preview-options button { padding: 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: white; font-weight: 600; font-size: 13px; }
+  .preview-options button:hover { border-color: var(--primary); color: var(--primary); }
+  .preview-options button.selected { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+  .preview-cta { width: 100%; padding: 12px; border: 1px solid var(--primary); color: var(--primary); border-radius: 8px; font-weight: 600; }
+  .preview-toggle-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .toggle { width: 38px; height: 22px; background: var(--border-strong); border-radius: 22px; position: relative; cursor: pointer; }
+  .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; background: white; border-radius: 50%; transition: left .15s; }
+  .toggle.on { background: var(--primary); }
+  .toggle.on::after { left: 18px; }
+  .preview-empty-state { padding: 24px; color: var(--text-mute); text-align: center; font-style: italic; background: white; border-radius: 8px; border: 1px dashed var(--border-strong); margin: 8px 0; font-size: 13px; }
+
+  .preview-right { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+  .preview-right-header { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .preview-right-header h3 { margin: 0; font-size: 16px; font-weight: 700; }
+  .preview-right-body { flex: 1; overflow-y: auto; padding: 14px 18px; }
+  .pref-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .pref-row label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+  .pref-row .clear-link { color: var(--primary); font-weight: 700; font-size: 11px; letter-spacing: .5px; }
+  .pref-classifier { margin-bottom: 10px; position: relative; }
+  .pref-classifier select { width: 100%; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 13px; background: white; appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236a7282' viewBox='0 0 16 16'><path d='M4 6l4 4 4-4'/></svg>"); background-repeat: no-repeat; background-position: right 8px center; }
+  .pref-classifier-label { position: absolute; top: -7px; left: 10px; background: white; padding: 0 4px; font-size: 10px; color: var(--text-mute); }
+  .pref-classifier-disabled { opacity: .45; pointer-events: none; }
+
+  .preview-footer { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-top: 1px solid var(--border); background: white; gap: 12px; }
+  .preview-footer .nav-btn { display: flex; align-items: center; gap: 6px; color: var(--text-mute); font-size: 13px; }
+  .preview-progress { flex: 1; text-align: center; font-size: 12px; color: var(--text-mute); }
+  .preview-progress .bar { height: 6px; background: var(--border); border-radius: 6px; margin: 4px auto 4px; max-width: 220px; overflow: hidden; }
+  .preview-progress .bar > div { background: var(--primary); height: 100%; }
+
+  /* ===== Generic ===== */
+  .hidden { display: none !important; }
+  .visually-hidden { position: absolute; left: -9999px; }
+  .floating-toolbar { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: white; padding: 10px 18px; border-radius: 8px; box-shadow: 0 8px 24px rgba(20,30,60,.12); display: flex; gap: 18px; align-items: center; color: var(--text-mute); }
+  .floating-toolbar button { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .floating-toolbar button svg { width: 22px; height: 22px; }
+  .floating-toolbar button:hover { color: var(--primary); }
+  .floating-toolbar.module-mode button:not([data-action="open-preview"]) { opacity: .35; cursor: not-allowed; pointer-events: none; }
+  .floating-toolbar button[data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1c2330;
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .12s;
+    z-index: 60;
+  }
+  .floating-toolbar button[data-tip]::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #1c2330;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .12s;
+    z-index: 60;
+  }
+  .floating-toolbar button[data-tip]:hover::after,
+  .floating-toolbar button[data-tip]:hover::before { opacity: 1; }
+
+  /* small helper for tooltip-like badge near "Always visible" demo */
+  .demo-toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: #1c2330; color: white; padding: 10px 16px; border-radius: 8px; font-size: 13px; z-index: 50; opacity: 0; pointer-events: none; transition: opacity .2s; box-shadow: 0 8px 24px rgba(20,30,60,.18); }
+  .demo-toast.show { opacity: 1; }
+
+  /* Confirm dialog */
+  .confirm-overlay { position: fixed; inset: 0; background: rgba(20,30,60,.4); display: none; align-items: center; justify-content: center; z-index: 60; }
+  .confirm-overlay.show { display: flex; }
+  .confirm-card { background: white; border-radius: 12px; padding: 24px; max-width: 440px; width: calc(100% - 32px); box-shadow: 0 20px 60px rgba(20,30,60,.18); }
+  .confirm-card h3 { margin: 0 0 10px; font-size: 17px; font-weight: 700; }
+  .confirm-card p { margin: 0 0 20px; color: var(--text-mute); font-size: 14px; line-height: 1.5; }
+  .confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<!-- Drawer -->
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
+
+<!-- Preview modal -->
+<div class="preview-modal-overlay" id="previewOverlay">
+  <div class="preview-modal" id="previewModal"></div>
+</div>
+
+<!-- Floating toolbar shown in steps tab -->
+<div class="floating-toolbar" id="floatingToolbar">
+  <button data-tip="Preview" data-action="open-preview"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
+  <button data-tip="Add interaction"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17.5h7M17.5 14v7"/></svg></button>
+  <button data-tip="Add process step"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12"/><path d="M4 8h16"/><rect x="2" y="11" width="12" height="9" rx="1.5"/><circle cx="18.5" cy="17.5" r="4"/><path d="M18.5 15.5v4M16.5 17.5h4"/></svg></button>
+  <button data-tip="Add pictogram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></button>
+  <button data-tip="Select multiple"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 4-9 4-9-4 9-4z"/><path d="m3 12 9 4 9-4"/><path d="m3 17 9 4 9-4"/></svg></button>
+</div>
+
+<!-- Global tooltip (used for vis-tag rule descriptions) -->
+<div class="global-tooltip" id="globalTooltip"></div>
+
+<!-- Toast -->
+<div class="demo-toast" id="demoToast">Always visible</div>
+
+<!-- Confirm dialog -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-card">
+    <h3 id="confirmTitle"></h3>
+    <p id="confirmMessage"></p>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" id="confirmCancel">Cancel</button>
+      <button class="btn btn-primary" id="confirmOk">Continue</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===================================================
+ * Operations1 — Visibility logic prototype
+ * Single-page in-memory clickable demo
+ * =================================================== */
+
+// ===== SVG icon helpers =====
+const ICONS = {
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.06 10.06 0 0 1 12 19c-6 0-10-7-10-7a17.42 17.42 0 0 1 4.17-5.06"/><path d="M1 1l22 22"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6 0 10 7 10 7a17.42 17.42 0 0 1-3.17 4.06"/></svg>',
+  kebab: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>',
+  paperclip: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>',
+  plus: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>',
+  x: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  chevDown: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>',
+  chevRight: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>',
+  back: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>',
+  trash: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
+  pause: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>',
+  thumbsUp: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88z"/></svg>',
+  check: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>',
+  hash: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>',
+  list: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
+  camera: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/></svg>',
+  module: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
+  play: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21"/></svg>',
+  resize: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 3 12 9 6"/><polyline points="15 18 21 12 15 6"/></svg>',
+  doc: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
+};
+
+// ===== Classifier vocabulary =====
+const CLASSIFIERS = {
+  'Location': ['London', 'Munich', 'Madrid', 'Paris', 'Berlin', 'Frankfurt', 'Amsterdam'],
+  'Machine': ['GX 450', 'GX 500', 'GX 550', 'GX 700', 'HX 100'],
+  'Business Unit': ['Industrial', 'Consumer', 'Medical'],
+  'Department': ['D005', 'A5695', 'H7678', 'K5683', 'E4573', 'Y5688'],
+  'Production area': ['Line A', 'Line B', 'Line C'],
+  'Device type': ['Robot arm', 'CNC', 'Conveyor'],
+  'Module': ['M1', 'M2', 'M3'],
+  'Assembly group': ['Group A', 'Group B'],
+  'Material': ['Steel', 'Aluminum', 'Plastic'],
+  'Characteristic value': ['Low', 'Medium', 'High'],
+  'Order': ['C045', 'A5695', 'KJ8690', 'RF4783', 'VF4673'],
+};
+
+// "Connected" classes — those actually used by some logic in the doc
+const CONNECTED_CLASSES = new Set(['Location', 'Machine', 'Department']);
+
+// ===== Dummy data =====
+function uid(prefix) { return prefix + '-' + Math.random().toString(36).slice(2, 9); }
+
+let state = {
+  activeTab: 'steps',
+  activeStepId: 's1',
+  activeModuleId: null,
+  drawer: { open: false, targetId: null, readOnly: false, openAddClassifier: null, openOperator: null, draftMode: false },
+  preview: { open: false, classifierSelections: {}, onlyConnected: true, responses: {}, classifiersPanelOpen: true },
+  moduleMenus: {},
+  stepMenus: {},
+  expandedInteractions: { 'i1-2': true },
+};
+
+const data = {
+  title: 'Assembly instructions machine A3',
+  version: '1.6',
+  language: 'English',
+  status: 'Draft',
+  steps: [
+    {
+      id: 's1', title: 'Table and safety',
+      visibility: { type: 'always' },
+      processSteps: [
+        {
+          id: 'ps1-1', title: 'Machine information and preparation',
+          visibility: { type: 'always' },
+          attachments: [
+            { name: 'gear.jpg', img: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=200&q=60' },
+            { name: 'lab.jpg', img: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=200&q=60' },
+            { name: 'motor.jpg', img: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=200&q=60' },
+          ],
+          interactions: [
+            { id: 'i1-1', type: 'pause', label: 'Enter the machine serialnumber',
+              mandatory: true, hasExplanation: false, hasNA: false,
+              visibility: { type: 'always' } },
+            { id: 'i1-2', type: 'thumbsUp', label: 'Is the engine cover in a good condition?',
+              mandatory: true, hasExplanation: false, hasNA: false,
+              response: 'NOK', failedIf: true, criticality: 'Basic',
+              isGoverning: true,
+              visibility: { type: 'always' } },
+          ],
+        },
+        {
+          id: 'ps1-2', title: 'First assessment',
+          visibility: { type: 'conditional', rules: [
+            { id: uid('r'), classifier: 'Location', values: ['London', 'Munich', 'Madrid', 'Paris', 'Berlin'], notShow: false },
+            { id: uid('op'), op: 'AND' },
+            { id: uid('r'), classifier: 'Machine', values: ['GX 450', 'GX 500', 'GX 550', 'GX 700'], notShow: false },
+          ]},
+          attachments: [],
+          interactions: [
+            { id: 'i2-1', type: 'list', label: 'Select machine variant',
+              mandatory: true, dropdown: false, single: false,
+              visibility: { type: 'inherited' } },
+            { id: 'i2-2', type: 'hash', label: 'Enter measured torque (Nm)',
+              mandatory: true, visible: true,
+              visibility: { type: 'inherited' } },
+            { id: 'i2-3', type: 'check', label: 'Cover bolts torqued correctly',
+              mandatory: true,
+              visibility: { type: 'inherited' } },
+          ],
+        },
+      ],
+    },
+    {
+      id: 's2', title: 'Mounting the cover',
+      visibility: { type: 'conditional', rules: [
+        { id: uid('r'), classifier: 'Machine', values: ['GX 700'], notShow: false },
+      ]},
+      processSteps: [
+        {
+          id: 'ps2-1', title: 'Cover preparation',
+          visibility: { type: 'inherited' },
+          attachments: [],
+          interactions: [
+            { id: 'i3-1', type: 'check', label: 'Confirm cover is clean', mandatory: true,
+              visibility: { type: 'inherited' } },
+          ],
+        },
+      ],
+    },
+    {
+      id: 's3', title: 'Quality inspection',
+      visibility: { type: 'always' },
+      processSteps: [
+        {
+          id: 'ps3-1', title: 'Visual inspection',
+          visibility: { type: 'always' }, attachments: [],
+          interactions: [
+            { id: 'ix-3a-1', type: 'check', label: 'No visible scratches or dents on housing', mandatory: true, visibility: { type: 'always' } },
+            { id: 'ix-3a-2', type: 'thumbsUp', label: 'Are all labels readable?', mandatory: true, response: 'OK', criticality: 'Basic', visibility: { type: 'always' } },
+            { id: 'ix-3a-3', type: 'pause', label: 'Take overview photo of the unit', mandatory: false, visibility: { type: 'always' } },
+          ],
+        },
+        {
+          id: 'ps3-2', title: 'Functional check',
+          visibility: { type: 'always' }, attachments: [],
+          interactions: [
+            { id: 'ix-3b-1', type: 'hash', label: 'Measured input voltage (V)', mandatory: true, visible: true, visibility: { type: 'always' } },
+            { id: 'ix-3b-2', type: 'list', label: 'Select test profile', mandatory: true, dropdown: true, single: true, visibility: { type: 'always' } },
+            { id: 'ix-3b-3', type: 'check', label: 'Confirm power-on self-test passed', mandatory: true, visibility: { type: 'always' } },
+            { id: 'ix-3b-4', type: 'thumbsUp', label: 'Is noise level within spec?', mandatory: true, response: 'OK', criticality: 'High', visibility: { type: 'always' } },
+          ],
+        },
+      ],
+    },
+    {
+      id: 's4', title: 'Electrical wiring',
+      visibility: { type: 'always' },
+      processSteps: [
+        {
+          id: 'ps4-1', title: 'Cable routing',
+          visibility: { type: 'always' }, attachments: [],
+          interactions: [
+            { id: 'ix-4a-1', type: 'check', label: 'Route the main harness through the chassis loom', mandatory: true, visibility: { type: 'always' } },
+            { id: 'ix-4a-2', type: 'check', label: 'Secure cables with the supplied clips', mandatory: true, visibility: { type: 'always' } },
+            { id: 'ix-4a-3', type: 'pause', label: 'Photograph the routing for QA records', mandatory: false, visibility: { type: 'always' } },
+          ],
+        },
+        {
+          id: 'ps4-2', title: 'Connection check',
+          visibility: { type: 'always' }, attachments: [],
+          interactions: [
+            { id: 'ix-4b-1', type: 'thumbsUp', label: 'Are all connectors fully seated?', mandatory: true, response: 'OK', criticality: 'High', visibility: { type: 'always' } },
+            { id: 'ix-4b-2', type: 'hash', label: 'Measured resistance on ground bus (Ω)', mandatory: true, visible: true, visibility: { type: 'always' } },
+            { id: 'ix-4b-3', type: 'check', label: 'Apply strain relief at exit points', mandatory: true, visibility: { type: 'always' } },
+          ],
+        },
+      ],
+    },
+    {
+      id: 's5', title: 'Final assembly and testing',
+      visibility: { type: 'always' },
+      processSteps: [
+        {
+          id: 'ps5-1', title: 'Final assembly',
+          visibility: { type: 'always' }, attachments: [],
+          interactions: [
+            { id: 'ix-5a-1', type: 'check', label: 'Fit upper enclosure and torque to 4 Nm', mandatory: true, visibility: { type: 'always' } },
+            { id: 'ix-5a-2', type: 'check', label: 'Attach the front bezel', mandatory: true, visibility: { type: 'always' } },
+            { id: 'ix-5a-3', type: 'list', label: 'Select packaging configuration', mandatory: true, dropdown: false, single: true, visibility: { type: 'always' } },
+          ],
+        },
+        {
+          id: 'ps5-2', title: 'Performance test',
+          visibility: { type: 'always' }, attachments: [],
+          interactions: [
+            { id: 'ix-5b-1', type: 'hash', label: 'Idle current draw (mA)', mandatory: true, visible: true, visibility: { type: 'always' } },
+            { id: 'ix-5b-2', type: 'hash', label: 'Load current draw (mA)', mandatory: true, visible: true, visibility: { type: 'always' } },
+            { id: 'ix-5b-3', type: 'thumbsUp', label: 'Is the unit ready to ship?', mandatory: true, response: 'OK', criticality: 'High', visibility: { type: 'always' } },
+            { id: 'ix-5b-4', type: 'pause', label: 'Attach completed test report', mandatory: true, visibility: { type: 'always' } },
+          ],
+        },
+      ],
+    },
+  ],
+  modules: [
+    { id: 'm1', position: 2, name: 'Calibration routine', version: 'newest version 1.0', readOnly: true,
+      classifiers: { Department: ['E4573', 'Y5688'], Location: ['Amsterdam', 'Munich'] },
+      step: {
+        id: 'm1-step', title: 'Calibration setup',
+        visibility: { type: 'conditional', rules: [
+          { id: uid('r'), classifier: 'Business Unit', values: ['Industrial', 'Consumer'], notShow: false },
+        ]},
+        processSteps: [
+          {
+            id: 'm1-ps-1', title: 'Prepare calibration jig',
+            visibility: { type: 'conditional', rules: [
+              { id: uid('r'), classifier: 'Location', values: ['London', 'Munich'], notShow: false },
+            ]},
+            attachments: [],
+            interactions: [
+              { id: 'm1-ix-1', type: 'check', label: 'Position jig on workbench', mandatory: true, visibility: { type: 'always' } },
+              { id: 'm1-ix-2', type: 'thumbsUp', label: 'Is the reference plate aligned?', mandatory: true, response: 'OK', criticality: 'High', visibility: { type: 'always' } },
+              { id: 'm1-ix-3', type: 'hash', label: 'Ambient temperature (°C)', mandatory: true, visible: true, visibility: { type: 'always' } },
+            ],
+          },
+          {
+            id: 'm1-ps-2', title: 'Run calibration sequence',
+            visibility: { type: 'always' }, attachments: [],
+            interactions: [
+              { id: 'm1-ix-4', type: 'pause', label: 'Start the calibration routine on the controller', mandatory: true, visibility: { type: 'always' } },
+              { id: 'm1-ix-5', type: 'check', label: 'Confirm calibration completed without errors', mandatory: true, visibility: { type: 'always' } },
+              { id: 'm1-ix-6', type: 'list', label: 'Calibration profile used', mandatory: true, dropdown: true, single: true, visibility: { type: 'always' } },
+            ],
+          },
+        ],
+      },
+    },
+    { id: 'm2', position: 4, name: 'Lockout / tagout (LOTO)', version: 'newest version 1.0', readOnly: true,
+      classifiers: { Material: ['Steel', 'Aluminum'] },
+      step: {
+        id: 'm2-step', title: 'Safety lockout',
+        visibility: { type: 'always' },
+        processSteps: [
+          {
+            id: 'm2-ps-1', title: 'Isolate power sources',
+            visibility: { type: 'always' }, attachments: [],
+            interactions: [
+              { id: 'm2-ix-1', type: 'check', label: 'Switch main disconnect to OFF', mandatory: true, visibility: { type: 'always' } },
+              { id: 'm2-ix-2', type: 'check', label: 'Apply personal lockout tag', mandatory: true, visibility: { type: 'always' } },
+              { id: 'm2-ix-3', type: 'thumbsUp', label: 'Voltage test confirms no live circuits?', mandatory: true, response: 'OK', criticality: 'High',
+                visibility: { type: 'conditional', rules: [
+                  { id: uid('r'), classifier: 'Machine', values: ['GX 700'], notShow: false },
+                ]} },
+            ],
+          },
+          {
+            id: 'm2-ps-2', title: 'Verify safe state',
+            visibility: { type: 'always' }, attachments: [],
+            interactions: [
+              { id: 'm2-ix-4', type: 'hash', label: 'Measured residual voltage (V)', mandatory: true, visible: true, visibility: { type: 'always' } },
+              { id: 'm2-ix-5', type: 'check', label: 'Confirm pressure vented from accumulator', mandatory: true, visibility: { type: 'always' } },
+              { id: 'm2-ix-6', type: 'pause', label: 'Notify supervisor that machine is locked out', mandatory: false, visibility: { type: 'always' } },
+            ],
+          },
+        ],
+      },
+    },
+    { id: 'm3', position: 7, name: 'Sub-assembly mounting', version: 'newest version 1.0', readOnly: true,
+      classifiers: { 'Assembly group': ['Group A'] },
+      step: {
+        id: 'm3-step', title: 'Sub-assembly mounting',
+        visibility: { type: 'conditional', rules: [
+          { id: uid('r'), classifier: 'Assembly group', values: ['Group A'], notShow: false },
+          { id: uid('op'), op: 'AND' },
+          { id: uid('r'), classifier: 'Machine', values: ['GX 500', 'GX 550', 'GX 700'], notShow: false },
+        ]},
+        processSteps: [
+          {
+            id: 'm3-ps-1', title: 'Mount sub-assembly bracket',
+            visibility: { type: 'always' }, attachments: [],
+            interactions: [
+              { id: 'm3-ix-1', type: 'check', label: 'Align bracket with reference holes', mandatory: true, visibility: { type: 'always' } },
+              { id: 'm3-ix-2', type: 'hash', label: 'Torque applied to bracket bolts (Nm)', mandatory: true, visible: true, visibility: { type: 'always' } },
+              { id: 'm3-ix-3', type: 'thumbsUp', label: 'Bracket flush with surface?', mandatory: true, response: 'OK', criticality: 'Basic', visibility: { type: 'always' } },
+            ],
+          },
+          {
+            id: 'm3-ps-2', title: 'Attach sub-assembly',
+            visibility: { type: 'conditional', rules: [
+              { id: uid('r'), classifier: 'Department', values: ['D005', 'A5695'], notShow: false },
+              { id: uid('op'), op: 'AND' },
+              { id: uid('r'), classifier: 'Production area', values: ['Line A', 'Line B'], notShow: false },
+            ]},
+            attachments: [],
+            interactions: [
+              { id: 'm3-ix-4', type: 'check', label: 'Insert sub-assembly into bracket', mandatory: true, visibility: { type: 'always' } },
+              { id: 'm3-ix-5', type: 'check', label: 'Connect ribbon cable to mainboard', mandatory: true, visibility: { type: 'always' } },
+              { id: 'm3-ix-6', type: 'pause', label: 'Photograph the completed mount', mandatory: false, visibility: { type: 'always' } },
+            ],
+          },
+        ],
+      },
+    },
+    { id: 'm4', position: 9, name: 'Sub-assembly inspection', version: 'newest version 1.0', readOnly: true,
+      classifiers: { Module: ['M2'] },
+      step: {
+        id: 'm4-step', title: 'Sub-assembly inspection',
+        visibility: { type: 'conditional', rules: [
+          { id: uid('r'), classifier: 'Production area', values: ['Line A', 'Line B'], notShow: false },
+        ]},
+        processSteps: [
+          {
+            id: 'm4-ps-1', title: 'Visual sub-assembly check',
+            visibility: { type: 'always' }, attachments: [],
+            interactions: [
+              { id: 'm4-ix-1', type: 'thumbsUp', label: 'All connectors fully seated?', mandatory: true, response: 'OK', criticality: 'High', visibility: { type: 'always' } },
+              { id: 'm4-ix-2', type: 'check', label: 'No visible damage to PCB', mandatory: true, visibility: { type: 'always' } },
+              { id: 'm4-ix-3', type: 'list', label: 'Inspection result', mandatory: true, dropdown: false, single: true,
+                visibility: { type: 'conditional', rules: [
+                  { id: uid('r'), classifier: 'Material', values: ['Steel', 'Aluminum'], notShow: false },
+                ]} },
+            ],
+          },
+        ],
+      },
+    },
+  ],
+  inheritedClassifiers: {
+    fromSteps: { Department: ['H7678', 'K5683'], Location: ['Frankfurt', 'Berlin'], Order: ['KJ8690', 'RF4783'] },
+    fromModules: { Department: ['E4573', 'Y5688'], Location: ['Amsterdam', 'Munich'], Order: ['VF4673'] },
+  },
+  structureClasses: { Department: ['D005', 'A5695'], Location: ['London', 'Madrid', 'Paris'], Order: ['C045', 'A5695'] },
+  appliedFromInherited: {}, // { className: { value: 'fromSteps' | 'fromModules' } }
+};
+
+// ===== Element lookup helpers =====
+function buildNavigationSequence() {
+  const sortedModules = [...data.modules].sort((a, b) => a.position - b.position);
+  const items = [];
+  let stepIdx = 0;
+  let mIdx = 0;
+  let pos = 1;
+  while (stepIdx < data.steps.length || mIdx < sortedModules.length) {
+    const m = sortedModules[mIdx];
+    if (m && m.position === pos) { items.push({ kind: 'module', module: m, step: m.step }); mIdx++; }
+    else if (stepIdx < data.steps.length) { items.push({ kind: 'step', step: data.steps[stepIdx] }); stepIdx++; }
+    else { items.push({ kind: 'module', module: m, step: m.step }); mIdx++; }
+    pos++;
+  }
+  return items;
+}
+
+function currentNavIndex(seq) {
+  seq = seq || buildNavigationSequence();
+  if (state.activeModuleId) return seq.findIndex(it => it.kind === 'module' && it.module.id === state.activeModuleId);
+  return Math.max(0, seq.findIndex(it => it.kind === 'step' && it.step.id === state.activeStepId));
+}
+
+function navigateToIndex(idx) {
+  const seq = buildNavigationSequence();
+  if (idx < 0 || idx >= seq.length) return;
+  const item = seq[idx];
+  if (item.kind === 'module') { state.activeModuleId = item.module.id; state.activeStepId = null; }
+  else { state.activeStepId = item.step.id; state.activeModuleId = null; }
+}
+
+function findElement(id) {
+  for (const step of data.steps) {
+    if (step.id === id) return { kind: 'step', step, parent: null, element: step };
+    for (const ps of step.processSteps) {
+      if (ps.id === id) return { kind: 'processStep', step, processStep: ps, element: ps };
+      for (const ix of ps.interactions) {
+        if (ix.id === id) return { kind: 'interaction', step, processStep: ps, interaction: ix, element: ix };
+      }
+    }
+  }
+  for (const m of data.modules) {
+    if (!m.step) continue;
+    if (m.step.id === id) return { kind: 'step', step: m.step, parent: null, element: m.step, inModule: m };
+    for (const ps of m.step.processSteps) {
+      if (ps.id === id) return { kind: 'processStep', step: m.step, processStep: ps, element: ps, inModule: m };
+      for (const ix of ps.interactions) {
+        if (ix.id === id) return { kind: 'interaction', step: m.step, processStep: ps, interaction: ix, element: ix, inModule: m };
+      }
+    }
+  }
+  return null;
+}
+
+function findGoverningInteraction(parentId) {
+  const f = findElement(parentId);
+  return f ? f.interaction : null;
+}
+
+// ===== Visibility evaluation =====
+// classifierSelections shape: { Location: ['Munich'], Machine: ['GX 500'] }
+// responses shape: { interactionId: 'OK' | 'NOK' }
+function evalRules(rules, selections) {
+  if (!rules || rules.length === 0) return true;
+  // groups joined by op fields (AND/OR). For simplicity all groups join with AND.
+  const groups = [];
+  let current = [];
+  for (const r of rules) {
+    if (r.op) { groups.push(current); current = []; }
+    else current.push(r);
+  }
+  groups.push(current);
+  // each group: rule that classifier in selections matches one of values
+  const groupResults = groups.map(g => g.every(rule => {
+    const sel = selections[rule.classifier] || [];
+    const intersection = rule.values.some(v => sel.includes(v));
+    return rule.notShow ? !intersection : intersection;
+  }));
+  return groupResults.every(Boolean);
+}
+
+function isVisible(element, ctx) {
+  const v = element.visibility;
+  if (!v || v.type === 'always') return true;
+  if (v.type === 'conditional') return evalRules(v.rules, ctx.selections);
+  if (v.type === 'inherited') {
+    if (!ctx.parentVisible) return false;
+    const effective = buildEffectiveRules(element);
+    if (effective.length) return evalRules(effective, ctx.selections);
+    return true;
+  }
+  if (v.type === 'governed') {
+    const resp = ctx.responses[v.parentInteractionId];
+    return resp === v.parentResponse;
+  }
+  return true;
+}
+
+// ===== Summary text generation =====
+function summarize(element) {
+  const v = element.visibility;
+  if (!v || v.type === 'always') return 'This element is always visible.';
+  if (v.type === 'inherited') {
+    const effective = buildEffectiveRules(element);
+    if (effective.length) return summarizeRules(element, effective);
+    return 'Visibility is inherited from the parent element.';
+  }
+  if (v.type === 'governed') {
+    const parent = findGoverningInteraction(v.parentInteractionId);
+    return `Show when the answer to "${parent ? parent.label : 'parent interaction'}" is "${v.parentResponse}".`;
+  }
+  if (v.type === 'conditional') {
+    return summarizeRules(element, v.rules);
+  }
+  return '';
+}
+
+function summarizeRules(element, rules) {
+  const kind = elementKindLabel(element);
+  const parts = [];
+  let current = [];
+  for (const r of rules) {
+    if (r.op) { parts.push(current); current = []; parts.push(r.op); }
+    else current.push(r);
+  }
+  parts.push(current);
+  let str = `Show ${kind} `;
+  if (kind === 'process step') str += 'with all the interactions inside ';
+  str += 'when ';
+  let textParts = [];
+  parts.forEach(p => {
+    if (typeof p === 'string') { textParts.push(p); return; }
+    const segs = p.map(rule => {
+      const verb = rule.notShow ? 'is NOT' : 'is';
+      const valStr = rule.values.length > 1
+        ? rule.values.slice(0, -1).join(', ') + ', or ' + rule.values.slice(-1)
+        : rule.values[0] || '(empty)';
+      return `${rule.classifier} ${verb} ${valStr}`;
+    });
+    textParts.push(segs.join(' AND '));
+  });
+  return str + textParts.join(' ') + '.';
+}
+
+function elementKindLabel(element) {
+  const allSteps = [...data.steps, ...data.modules.filter(m => m.step).map(m => m.step)];
+  for (const s of allSteps) {
+    if (s.id === element.id) return 'step';
+    for (const ps of s.processSteps) {
+      if (ps.id === element.id) return 'process step';
+      for (const ix of ps.interactions) {
+        if (ix.id === element.id) return 'interaction';
+      }
+    }
+  }
+  return 'element';
+}
+
+// ===== Inheritance normalization =====
+// If a step/process step has rules, all children with no own rules become "inherited".
+// If a parent no longer has rules, children previously inherited revert to "always".
+function normalizeVisibilityInheritance() {
+  const allSteps = [...data.steps, ...data.modules.filter(m => m.step).map(m => m.step)];
+  for (const step of allSteps) {
+    const stepHasRules = step.visibility && step.visibility.type === 'conditional';
+    for (const ps of step.processSteps) {
+      if (stepHasRules) {
+        if (!ps.visibility || ps.visibility.type === 'always') ps.visibility = { type: 'inherited' };
+      } else if (ps.visibility && ps.visibility.type === 'inherited') {
+        ps.visibility = { type: 'always' };
+      }
+      const psHasRules = ps.visibility && ps.visibility.type === 'conditional';
+      const ancestorHasRules = psHasRules || stepHasRules;
+      for (const ix of ps.interactions) {
+        if (ancestorHasRules) {
+          if (!ix.visibility || ix.visibility.type === 'always') ix.visibility = { type: 'inherited' };
+        } else if (ix.visibility && ix.visibility.type === 'inherited') {
+          ix.visibility = { type: 'always' };
+        }
+      }
+    }
+  }
+}
+
+// ===== Render: top-level =====
+function render() {
+  normalizeVisibilityInheritance();
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    ${renderTopbar()}
+    <div class="content">
+      ${state.activeTab === 'steps' ? renderStepsTab()
+        : state.activeTab === 'information' ? renderInfoTab()
+        : state.activeTab === 'modules' ? renderModulesTab()
+        : renderPlaceholderTab()}
+    </div>
+  `;
+  const toolbar = document.getElementById('floatingToolbar');
+  toolbar.classList.toggle('hidden', state.activeTab !== 'steps');
+  toolbar.classList.toggle('module-mode', !!state.activeModuleId);
+  renderDrawer();
+  renderPreviewModal();
+  attachEvents();
+}
+
+function renderTopbar() {
+  const tabs = ['Steps', 'Information', 'Modules', 'Media', 'Material', 'Access', 'AI knowledge'];
+  return `
+    <div class="topbar">
+      <div class="topbar-row">
+        <div class="topbar-title-block">
+          <div class="crumb">DOCUMENTS</div>
+          <h1>${data.title}</h1>
+        </div>
+        <div class="topbar-actions">
+          <button class="kebab" title="More">${ICONS.kebab}</button>
+          <button class="btn btn-ghost">Close</button>
+          <button class="btn btn-primary">Request review</button>
+        </div>
+      </div>
+      <div class="tabs-row">
+        <div class="tabs">
+          ${tabs.map(t => `
+            <div class="tab ${state.activeTab === t.toLowerCase() ? 'active' : ''}" data-tab="${t.toLowerCase()}">${t}</div>
+          `).join('')}
+        </div>
+        <div class="tabs-meta">
+          <span class="meta-pill">${ICONS.doc} ${data.status}</span>
+          <span class="meta-pill">${data.version}</span>
+          <span class="meta-lang">${data.language} ${ICONS.chevDown}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ===== Steps tab =====
+function renderStepsTab() {
+  return `
+    <div class="steps-layout">
+      <aside class="steps-sidebar">
+        <button class="add-step-btn">${ICONS.plus} ADD NEW STEP</button>
+        <div class="step-list">
+          ${renderStepSidebarItems()}
+        </div>
+      </aside>
+      <main class="steps-main">
+        ${renderActiveStep()}
+      </main>
+    </div>
+  `;
+}
+
+function renderStepSidebarItems() {
+  // Build interleaved list of steps and modules with continuous numbering.
+  // Each module contributes one slot (its single step), so modules count toward
+  // the overall document numbering. Module.position is the desired slot.
+  const sortedModules = [...data.modules].sort((a, b) => a.position - b.position);
+  const items = [];
+  let stepIdx = 0;
+  let mIdx = 0;
+  let pos = 1;
+  while (stepIdx < data.steps.length || mIdx < sortedModules.length) {
+    const m = sortedModules[mIdx];
+    if (m && m.position === pos) {
+      items.push({ type: 'module', module: m, num: pos });
+      mIdx++;
+    } else if (stepIdx < data.steps.length) {
+      items.push({ type: 'step', step: data.steps[stepIdx], num: pos });
+      stepIdx++;
+    } else {
+      // Trailing modules
+      items.push({ type: 'module', module: m, num: pos });
+      mIdx++;
+    }
+    pos++;
+  }
+
+  return items.map(it => {
+    if (it.type === 'module') {
+      const activeM = state.activeModuleId === it.module.id;
+      const stepTitle = it.module.step ? it.module.step.title : '';
+      return `
+        <div class="module-block ${activeM ? 'active' : ''}" data-action="select-module" data-module-id="${it.module.id}">
+          <div class="module-header">
+            <span class="module-header-icon">${ICONS.module}</span>
+            <span class="module-title">${escape(it.module.name)}</span>
+            <button class="kebab" data-action="module-menu" data-module-id="${it.module.id}">${ICONS.kebab}</button>
+            ${state.moduleMenus[it.module.id] ? `
+              <div class="module-menu show">
+                <button disabled>Open</button>
+                <button disabled>Unbox</button>
+                <button data-action="module-view-vis" data-module-id="${it.module.id}">View visibility logic</button>
+                <button data-action="module-delete" data-module-id="${it.module.id}">Delete</button>
+              </div>` : ''}
+          </div>
+          <div class="module-version">
+            <div class="module-version-select"><span>${it.module.version}</span>${ICONS.chevDown}</div>
+          </div>
+          ${stepTitle ? `
+            <div class="module-step-item">
+              <span class="step-num">${it.num}</span>
+              <span class="step-title-text">${escape(stepTitle)}</span>
+              <button class="step-kebab">${ICONS.kebab}</button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+    const step = it.step;
+    const active = step.id === state.activeStepId && !state.activeModuleId;
+    const menuOpen = state.stepMenus[step.id];
+    return `
+      <div class="step-item ${active ? 'active' : ''}" data-action="select-step" data-step-id="${step.id}">
+        <span class="step-num">${it.num}</span>
+        <span class="step-title-text">${escape(step.title)}</span>
+        <button class="step-kebab" data-action="step-menu" data-step-id="${step.id}">${ICONS.kebab}</button>
+        ${menuOpen ? `
+          <div class="module-menu show">
+            <button data-action="step-duplicate" data-step-id="${step.id}">Duplicate</button>
+            <button data-action="step-delete" data-step-id="${step.id}">Delete</button>
+          </div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function renderActiveStep() {
+  if (state.activeModuleId) {
+    const m = data.modules.find(mm => mm.id === state.activeModuleId);
+    if (m && m.step) return renderModuleStep(m);
+  }
+  const step = data.steps.find(s => s.id === state.activeStepId);
+  if (!step) return '<div style="padding:40px;color:var(--text-mute)">No step selected.</div>';
+  return `
+    <div class="step-header-card">
+      <input class="step-title-input" value="${escape(step.title)}" data-action="rename-step" data-step-id="${step.id}" />
+      ${renderVisTag(step)}
+    </div>
+    ${step.processSteps.map((ps, i) => renderProcessStep(ps, i + 1)).join('')}
+    <div class="add-ps-row">
+      <span class="add-ps-line"></span>
+      <button class="add-ps-btn">${ICONS.plus} ADD NEW PROCESS STEP</button>
+      <span class="add-ps-line"></span>
+    </div>
+    <div class="block-nav-row">
+      <input type="checkbox" />
+      <span>Block step navigation if entries are failed with</span>
+      <span class="info-bullet">i</span>
+      <label><input type="radio" name="crit" checked /> basic and high criticality</label>
+      <label><input type="radio" name="crit" /> only high criticality</label>
+    </div>
+  `;
+}
+
+function renderModuleStep(m) {
+  const step = m.step;
+  return `
+    <div class="module-banner">
+      <div>
+        <span class="module-banner-icon">${ICONS.module}</span>
+        <strong>${escape(m.name)}</strong>
+        <span class="module-banner-version">${escape(m.version)}</span>
+      </div>
+      <span class="module-banner-ro">READ-ONLY · MODULE CONTENT</span>
+    </div>
+    <div class="module-step-wrap">
+      <div class="step-header-card">
+        <span class="step-title-input" style="cursor:default">${escape(step.title)}</span>
+        ${renderVisTag(step)}
+      </div>
+      ${step.processSteps.map((ps, i) => renderProcessStep(ps, i + 1)).join('')}
+    </div>
+  `;
+}
+
+function renderProcessStep(ps, num) {
+  return `
+    <div class="process-step-card">
+      <div class="ps-header">
+        <span class="ps-num">${num}</span>
+        <input class="ps-title-input" value="${escape(ps.title)}" />
+        ${renderVisTag(ps)}
+        <button class="kebab">${ICONS.kebab}</button>
+      </div>
+      <div class="ps-attach">
+        ${ps.attachments && ps.attachments.length
+          ? `<div class="ps-attach-files">
+              ${ps.attachments.map(a => `
+                <div class="file-thumb" style="background-image:url('${a.img}')">
+                  <span class="file-thumb-kebab">${ICONS.kebab}</span>
+                  <span class="file-thumb-label">${ICONS.paperclip} ${escape(a.name)}</span>
+                </div>
+              `).join('')}
+            </div>`
+          : `<div class="ps-attach-empty">Drag & drop images, videos and PDFs</div>`
+        }
+      </div>
+      <div class="interaction-list" style="padding-bottom:14px">
+        ${ps.interactions.map(ix => renderInteraction(ix)).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderInteraction(ix) {
+  const expanded = state.expandedInteractions[ix.id];
+  const icon = ICONS[ix.type] || ICONS.check;
+  const extraControls = [];
+  if (ix.type === 'list') {
+    extraControls.push(checkboxPill('Dropdown', ix.dropdown));
+    extraControls.push(checkboxPill('Single', ix.single));
+  }
+  if (ix.type === 'hash') {
+    extraControls.push(checkboxPill('Visible', ix.visible, true));
+  }
+  return `
+    <div class="interaction-row ${expanded ? 'expanded' : ''}">
+      <div class="interaction-row-main">
+        <span class="interaction-icon">${icon}</span>
+        <span class="interaction-label">${escape(ix.label)}</span>
+        <div class="interaction-controls">
+          ${extraControls.join('')}
+          ${checkboxPill('Mandatory', ix.mandatory, true)}
+          ${checkboxPill('Explanation', ix.hasExplanation)}
+          ${checkboxPill('N/A', ix.hasNA)}
+          ${renderVisTag(ix)}
+          <button class="chev" data-action="toggle-interaction" data-interaction-id="${ix.id}">${expanded ? ICONS.chevDown : ICONS.chevRight}</button>
+        </div>
+      </div>
+      ${expanded ? `
+        <div class="interaction-expanded-body">
+          ${ix.type === 'thumbsUp' ? `
+            <div class="resp-row">
+              <span class="resp-key">Response:</span>
+              <label><input type="checkbox" ${ix.failedIf ? 'checked' : ''}/> Failed if</label>
+              <label><input type="radio" name="resp-${ix.id}" ${ix.response==='OK'?'checked':''}/> OK</label>
+              <label><input type="radio" name="resp-${ix.id}" ${ix.response==='NOK'?'checked':''}/> NOK</label>
+            </div>
+            <div class="resp-row">
+              <span class="resp-key">Criticality:</span>
+              <label><input type="radio" name="crit-${ix.id}" ${ix.criticality==='Basic'?'checked':''}/> Basic</label>
+              <label><input type="radio" name="crit-${ix.id}" ${ix.criticality==='High'?'checked':''}/> High</label>
+            </div>
+            <button class="add-tag-link">${ICONS.plus} ADD TAG</button>
+          ` : `
+            <div style="color:var(--text-mute);font-size:12px">Additional configuration would appear here.</div>
+          `}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function checkboxPill(label, checked, purple) {
+  const cls = ['checkbox-pill'];
+  if (checked) cls.push('checked');
+  if (checked && purple) cls.push('checked-purple');
+  return `<label class="${cls.join(' ')}"><input type="checkbox" ${checked ? 'checked' : ''}/> ${label}</label>`;
+}
+
+// ===== Visibility tag =====
+function renderVisTag(element) {
+  const v = element.visibility || { type: 'always' };
+  let cls = 'vis-tag ';
+  let body = '';
+  let tip = '';
+  if (v.type === 'always') {
+    cls += 'always';
+    body = `${ICONS.eye}`;
+  } else {
+    const count = countRules(element);
+    cls += 'conditional';
+    body = `${ICONS.eye}<span class="count">${count} rule${count===1?'':'s'}</span>`;
+    tip = tagTooltipText(element);
+  }
+  const tipAttr = tip ? ` data-tip="${escape(tip)}"` : '';
+  return `<span class="${cls}"${tipAttr} data-action="open-drawer" data-target-id="${element.id}">${body}</span>`;
+}
+
+function tagTooltipText(element) {
+  const v = element.visibility;
+  if (!v) return '';
+  if (v.type === 'conditional') return rulesToTooltipText(v.rules);
+  if (v.type === 'inherited') {
+    const effective = buildEffectiveRules(element);
+    if (effective.length) return rulesToTooltipText(effective);
+    return 'Inherited from parent';
+  }
+  if (v.type === 'governed') {
+    const parent = findGoverningInteraction(v.parentInteractionId);
+    return `Shown when "${parent ? parent.label : 'parent'}" answer is ${v.parentResponse}`;
+  }
+  return '';
+}
+
+function rulesToTooltipText(rules) {
+  const parts = [];
+  let current = [];
+  for (const r of rules) {
+    if (r.op) { parts.push(current); current = []; parts.push(r.op); }
+    else current.push(r);
+  }
+  parts.push(current);
+  const segments = parts.map(p => {
+    if (typeof p === 'string') return p;
+    return p.map(rule => {
+      const cls = rule.classifier;
+      const vals = rule.values.length ? rule.values.join(', ') : '(none)';
+      return rule.notShow ? `${cls} is NOT: ${vals}` : `${cls}: ${vals}`;
+    }).join(' AND ');
+  });
+  return segments.join(' ');
+}
+
+function countRules(element) {
+  const v = element.visibility;
+  if (!v || v.type === 'always') return 0;
+  if (v.type === 'conditional') return (v.rules || []).filter(r => !r.op).length;
+  if (v.type === 'governed') return 1;
+  if (v.type === 'inherited') {
+    const effective = buildEffectiveRules(element);
+    return effective.filter(r => !r.op).length;
+  }
+  return 0;
+}
+
+// ===== Information tab =====
+function renderInfoTab() {
+  const SC = data.structureClasses;
+  const IH = data.inheritedClassifiers;
+  return `
+    <div class="info-layout">
+      <div class="info-card">
+        <h4>Details</h4>
+        <div class="field-grid-2">
+          <div class="field"><label>Language</label><select><option>English</option><option>German</option></select></div>
+          <div class="field"><label>Classification</label><select><option>—</option></select></div>
+          <div class="field"><label>Valid until</label><input value=""/></div>
+          <div class="field"><label>Tags</label><select><option>—</option></select></div>
+          <div class="field full"><label>Notes</label><textarea></textarea></div>
+        </div>
+      </div>
+      <div class="info-card">
+        <h4>Qualification setting</h4>
+        <div class="field" style="margin-bottom:20px"><label>Qualifications required</label><select><option>—</option></select></div>
+        <div class="field"><label>Qualifications granted</label><select><option>—</option></select></div>
+        <p style="color:var(--text-mute);font-size:12px;margin:8px 0 0">Select the qualifications the user will receive after completing this report</p>
+      </div>
+      <div class="info-card">
+        <h4>Report execution setting</h4>
+        <div class="field-grid-2">
+          <div class="field"><label>Report completion prevention if failed</label><select><option>None</option></select></div>
+          <div class="field"><label>Step execution mode</label><select><option>Parallel</option></select></div>
+        </div>
+        <div class="checks-row">
+          <label><input type="checkbox" checked/> Create report automatically</label>
+          <label><input type="checkbox" checked/> Make visible to others</label>
+          <label><input type="checkbox" disabled/> Contain variables <span class="info-bullet" style="background:#9aa1ad">i</span></label>
+        </div>
+      </div>
+      <div class="info-card">
+        <h4>QR-Codes</h4>
+        <a>${ICONS.plus} Add QR-code</a>
+      </div>
+      <div class="info-card">
+        <h4>Structure classes</h4>
+        <a style="display:inline-block;margin-bottom:10px">Edit classifiers</a>
+        <div class="struct-classes-list">
+          ${Object.entries(SC).map(([cls, vals]) => `
+            <div class="class-row">
+              <span class="class-label">${cls}</span>
+              ${vals.map(v => `<span class="chip">${v}<span class="chip-x" data-action="remove-structure-value" data-class="${escape(cls)}" data-value="${escape(v)}">×</span></span>`).join('')}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="info-card">
+        <h4>Inherited classifiers</h4>
+        <p style="color:var(--text-mute);font-size:12px;margin:0 0 12px">Classifiers used in visibility logic across steps, process steps, interactions, and modules. These are not assigned to the document directly.</p>
+        <div style="font-size:11px;letter-spacing:.5px;color:var(--text-mute);font-weight:700;margin:8px 0">FROM STEPS, PROCESS STEPS, INTERACTIONS</div>
+        <div class="inherited-list">
+          ${Object.entries(IH.fromSteps).filter(([_, vals]) => vals.length > 0).map(([cls, vals]) => `
+            <div class="class-row">
+              <span class="class-label">${cls}</span>
+              ${vals.map(v => `<span>${v} <button class="add-icon-btn" data-tip="Apply to document" data-action="apply-inherited" data-source="fromSteps" data-class="${escape(cls)}" data-value="${escape(v)}">${ICONS.plus}</button></span>`).join(' ')}
+            </div>
+          `).join('') || `<div style="color:var(--text-mute);font-size:12px;font-style:italic">All values applied.</div>`}
+        </div>
+        <div style="font-size:11px;letter-spacing:.5px;color:var(--text-mute);font-weight:700;margin:18px 0 8px">FROM MODULES</div>
+        <div class="inherited-list">
+          ${Object.entries(IH.fromModules).filter(([_, vals]) => vals.length > 0).map(([cls, vals]) => `
+            <div class="class-row">
+              <span class="class-label">${cls}</span>
+              ${vals.map(v => `<span>${v} <button class="add-icon-btn" data-tip="Apply to document" data-action="apply-inherited" data-source="fromModules" data-class="${escape(cls)}" data-value="${escape(v)}">${ICONS.plus}</button></span>`).join(' ')}
+            </div>
+          `).join('') || `<div style="color:var(--text-mute);font-size:12px;font-style:italic">All values applied.</div>`}
+        </div>
+        <div class="apply-all-row"><a data-action="apply-all-inherited">APPLY ALL TO DOCUMENT</a></div>
+      </div>
+    </div>
+  `;
+}
+
+// ===== Modules tab =====
+function renderModulesTab() {
+  return `
+    <div class="modules-layout">
+      <div class="modules-grid">
+        ${data.modules.map(m => `
+          <div class="module-card">
+            <h5>${escape(m.name)}</h5>
+            <div class="mute">${escape(m.version)}</div>
+            <div class="mute">Read-only: classifiers cannot be edited from a module</div>
+            <button class="kebab module-kebab" data-action="module-menu" data-module-id="${m.id}">${ICONS.kebab}</button>
+            ${state.moduleMenus[m.id] ? `
+              <div class="module-menu show">
+                <button data-action="view-classifiers" data-module-id="${m.id}">View classifiers</button>
+              </div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderPlaceholderTab() {
+  return `<div style="padding:60px;text-align:center;color:var(--text-mute)">This tab is not part of the prototype scope.</div>`;
+}
+
+// ===== Drawer =====
+function renderDrawer() {
+  const drawer = document.getElementById('drawer');
+  const overlay = document.getElementById('drawerOverlay');
+  const prevBody = drawer.querySelector('.drawer-body');
+  const savedScroll = prevBody ? prevBody.scrollTop : 0;
+  drawer.classList.toggle('show', state.drawer.open);
+  overlay.classList.toggle('show', state.drawer.open);
+  drawer.classList.toggle('readonly', state.drawer.readOnly);
+  drawer.setAttribute('aria-hidden', state.drawer.open ? 'false' : 'true');
+
+  if (!state.drawer.open) { drawer.innerHTML = ''; return; }
+  const f = findElement(state.drawer.targetId);
+  if (!f) { drawer.innerHTML = ''; return; }
+  const el = f.element;
+  const v = el.visibility;
+
+  if (!v || v.type === 'always') {
+    drawer.innerHTML = `
+      <div class="drawer-header">
+        <h3>Visibility logic</h3>
+        <div class="drawer-header-actions">
+          <button class="kebab" data-action="close-drawer">${ICONS.x}</button>
+        </div>
+      </div>
+      <div class="drawer-body">
+        <div class="drawer-empty">
+          <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          <h4>No visibility logic applied</h4>
+          <p>This ${elementKindLabel(el)} is always visible.</p>
+          ${f.inModule ? '' : `<button class="btn btn-primary" data-action="add-visibility">${ICONS.plus} Add visibility logic</button>`}
+        </div>
+      </div>
+    `;
+    restoreDrawerScroll(savedScroll);
+    attachEvents();
+    return;
+  }
+
+  // Special read-only states: governed is fully read-only; inherited is partially editable
+  const isReadOnlyType = v.type === 'governed';
+
+  let bodyTop = '';
+  if (state.drawer.readOnly || isReadOnlyType) {
+    bodyTop = `<div class="readonly-notice">${readOnlyNoticeText(v, el)}</div>`;
+  } else if (v.type === 'inherited') {
+    bodyTop = `<div class="readonly-notice">Inherited from parent — class selection and connections are locked, but classifier values and additional class conditions can be edited.</div>`;
+  }
+
+  let logicHtml = '';
+  if (v.type === 'conditional') {
+    logicHtml = renderConditionalEditor(v.rules);
+  } else if (v.type === 'inherited') {
+    // Always derive the displayed rules from the parent live, so parent changes propagate.
+    const owner = findVisibilityOwner(el);
+    const inheritedFrom = owner ? owner.element : null;
+    const header = inheritedFrom
+      ? `<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">Inherited from ${elementKindLabel(inheritedFrom)}: <strong>${escape(inheritedFrom.title || inheritedFrom.label)}</strong></div>`
+      : '';
+    const effective = buildEffectiveRules(el);
+    logicHtml = effective.length
+      ? header + renderConditionalEditor(effective)
+      : header + `<div style="font-size:13px;color:var(--text-mute)">Visibility is inherited from the parent.</div>`;
+  } else if (v.type === 'governed') {
+    const parent = findGoverningInteraction(v.parentInteractionId);
+    logicHtml = `
+      <div class="class-card" style="opacity:.9">
+        <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:8px">Governed by interaction</div>
+        <div style="font-size:13px"><strong>"${escape(parent ? parent.label : '—')}"</strong></div>
+        <div class="chip-row">
+          <span style="font-size:12px;color:var(--text-mute)">Show when response is</span>
+          <span class="chip" style="background:var(--green-bg);border-color:transparent;color:var(--green-text)">${escape(v.parentResponse)}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  drawer.innerHTML = `
+    <div class="drawer-header">
+      <h3>Visibility logic</h3>
+      <div class="drawer-header-actions">
+        ${state.drawer.draftMode ? `<button class="btn btn-primary" style="padding:6px 14px" data-action="save-drawer">Save</button>` : ''}
+        <button class="kebab" data-action="close-drawer" data-tip="Close">${ICONS.x}</button>
+      </div>
+    </div>
+    <div class="drawer-body">
+      ${bodyTop}
+      ${(!isReadOnlyType && v.type !== 'inherited') ? `
+        <div class="drawer-top-row">
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" checked /> Only connected classifiers</label>
+          <button class="danger-link" data-action="delete-logic">DELETE LOGIC</button>
+        </div>
+      ` : ''}
+      ${(v.type === 'inherited') ? `
+        <div class="drawer-top-row">
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" checked /> Only connected classifiers</label>
+          <button class="danger-link" data-action="reset-inherited">RESET TO PARENT</button>
+        </div>
+      ` : ''}
+      ${logicHtml}
+      ${v.type === 'conditional' || v.type === 'inherited' ? `
+        <div class="summary-box">
+          <h5>Summary</h5>
+          <p>${escape(summarize(el))}</p>
+        </div>
+      ` : ''}
+      ${v.type === 'governed' ? `
+        <div class="summary-box">
+          <h5>Summary</h5>
+          <p>${escape(summarize(el))}</p>
+        </div>
+      ` : ''}
+    </div>
+  `;
+  restoreDrawerScroll(savedScroll);
+  attachEvents();
+}
+
+function restoreDrawerScroll(saved) {
+  const body = document.querySelector('#drawer .drawer-body');
+  if (body && saved != null) body.scrollTop = saved;
+}
+
+function readOnlyNoticeText(v, el) {
+  if (v.type === 'inherited') return 'Read-only — visibility is inherited from a parent element.';
+  if (v.type === 'governed') return 'Read-only — visibility is controlled by a governing interaction\'s response.';
+  return 'Read-only view.';
+}
+
+function findVisibilityOwner(element) {
+  // For an inherited element, ascend to nearest ancestor with non-inherited, non-always visibility
+  // (process step inherits from step; interaction inherits from process step or step)
+  const allSteps = [...data.steps, ...data.modules.filter(m => m.step).map(m => m.step)];
+  for (const step of allSteps) {
+    for (const ps of step.processSteps) {
+      for (const ix of ps.interactions) {
+        if (ix.id === element.id) {
+          if (ps.visibility.type !== 'inherited' && ps.visibility.type !== 'always') return { kind: 'ps', element: ps };
+          if (step.visibility.type !== 'inherited' && step.visibility.type !== 'always') return { kind: 'step', element: step };
+          return null;
+        }
+      }
+      if (ps.id === element.id) {
+        if (step.visibility.type !== 'inherited' && step.visibility.type !== 'always') return { kind: 'step', element: step };
+        return null;
+      }
+    }
+    if (step.id === element.id) return null;
+  }
+  return null;
+}
+
+function renderAddClassifierPopover(rule) {
+  // For locked (inherited) rules, only allow values from the parent's allowed list.
+  const all = rule.locked && rule.allowedValues
+    ? rule.allowedValues
+    : (CLASSIFIERS[rule.classifier] || []);
+  return `
+    <div class="classifier-popover" data-action="popover-stop">
+      <div class="classifier-popover-header">${escape(rule.classifier)} — pick values</div>
+      <div class="classifier-popover-list">
+        ${all.length === 0 ? `<div class="classifier-popover-empty">No values available.</div>` :
+          all.map(v => `
+            <label class="classifier-popover-item">
+              <input type="checkbox" ${rule.values.includes(v) ? 'checked' : ''} data-action="toggle-rule-value" data-rule-id="${rule.id}" data-value="${escape(v)}"/>
+              ${escape(v)}
+            </label>
+          `).join('')
+        }
+      </div>
+      <div class="classifier-popover-footer">
+        <button class="btn btn-primary" style="padding:4px 10px;font-size:12px" data-action="close-add-classifier">Done</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderConditionalEditor(rules) {
+  // Render class condition cards joined by operator pills
+  let html = '';
+  const groups = [];
+  let current = [];
+  for (const r of rules) {
+    if (r.op) { groups.push({ kind: 'cond', rules: current }); groups.push({ kind: 'op', op: r.op, opId: r.id, opLocked: !!r.locked }); current = []; }
+    else current.push(r);
+  }
+  groups.push({ kind: 'cond', rules: current });
+
+  groups.forEach((g, idx) => {
+    if (g.kind === 'op') {
+      const opId = g.opId;
+      const popoverOpen = state.drawer.openOperator === opId;
+      const opLocked = !!g.opLocked;
+      html += `
+        <div class="operator-wrap">
+          <div class="operator-line"></div>
+          <div class="operator-pill-anchor" style="position:relative">
+            <button class="operator-pill ${opLocked ? 'locked' : ''}" data-action="toggle-operator-popover" data-op-id="${opId}" ${opLocked ? 'disabled style="opacity:.6;cursor:not-allowed"' : ''}>
+              ${g.op} ${ICONS.chevDown}
+            </button>
+            ${popoverOpen ? `
+              <div class="operator-popover" data-action="popover-stop">
+                <div class="operator-popover-header">Operator</div>
+                <div class="operator-popover-list">
+                  ${['AND', 'OR'].map(o => `
+                    <button class="operator-popover-item ${o === g.op ? 'selected' : ''}" data-action="set-operator" data-op-id="${opId}" data-op-value="${o}">
+                      <span class="radio-dot"></span>${o}
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+          <div class="operator-line"></div>
+        </div>
+      `;
+      return;
+    }
+    g.rules.forEach(rule => {
+      const isLocked = !!rule.locked;
+      const classOptions = Object.keys(CLASSIFIERS).map(c =>
+        `<option ${c === rule.classifier ? 'selected' : ''} ${(isLocked || (state.drawer.readOnly && !CONNECTED_CLASSES.has(c))) ? 'disabled' : ''}>${c}</option>`
+      ).join('');
+      const selectAttrs = isLocked ? 'disabled' : '';
+      const trashAttrs = isLocked ? 'disabled style="opacity:.4;cursor:not-allowed"' : '';
+      const notShowAttrs = isLocked ? 'disabled' : '';
+      html += `
+        <div class="class-card ${rule.notShow ? 'not-show' : ''} ${isLocked ? 'locked' : ''}">
+          <div class="class-card-row">
+            <div class="class-card-select">
+              <label>Select class${isLocked ? ' (inherited)' : ''}</label>
+              <select data-action="change-rule-class" data-rule-id="${rule.id}" ${selectAttrs}>${classOptions}</select>
+            </div>
+            <button class="class-card-del" title="Remove" data-action="delete-rule" data-rule-id="${rule.id}" ${trashAttrs}>${ICONS.trash}</button>
+          </div>
+          <div class="chip-row">
+            ${rule.values.map((v, i) => `
+              <span class="chip">${escape(v)}<span class="chip-x" data-action="remove-rule-value" data-rule-id="${rule.id}" data-value="${escape(v)}">×</span></span>
+              ${i < rule.values.length - 1 ? `<span class="chip-op">OR</span>` : ''}
+            `).join('')}
+          </div>
+          <a class="add-classifier" data-action="open-add-classifier" data-rule-id="${rule.id}">${ICONS.plus} ADD CLASSIFIER
+            ${state.drawer.openAddClassifier === rule.id ? renderAddClassifierPopover(rule) : ''}
+          </a>
+          <div class="class-card-notshow">
+            <label><input type="checkbox" ${rule.notShow ? 'checked' : ''} data-action="toggle-not-show" data-rule-id="${rule.id}" ${notShowAttrs}/> Not show</label>
+          </div>
+        </div>
+      `;
+    });
+  });
+
+  html += `
+    <div class="add-class-cond-row">
+      <span class="add-class-cond-line"></span>
+      <button class="add-class-cond-btn" data-action="add-class-condition">${ICONS.plus} ADD CLASS CONDITION</button>
+      <span class="add-class-cond-line"></span>
+    </div>
+  `;
+  return html;
+}
+
+// ===== Preview modal =====
+function renderPreviewModal() {
+  const overlay = document.getElementById('previewOverlay');
+  overlay.classList.toggle('show', state.preview.open);
+  if (!state.preview.open) { document.getElementById('previewModal').innerHTML = ''; return; }
+
+  const modal = document.getElementById('previewModal');
+  modal.classList.toggle('classifiers-collapsed', !state.preview.classifiersPanelOpen);
+  const navSeq = buildNavigationSequence();
+  const navIdx = currentNavIndex(navSeq);
+  const navItem = navSeq[navIdx];
+  const step = navItem ? navItem.step : data.steps.find(s => s.id === state.activeStepId);
+  if (!step) { modal.innerHTML = ''; return; }
+  const stepVisible = isVisible(step, { selections: state.preview.classifierSelections, parentVisible: true, responses: state.preview.responses });
+
+  // Build preview body
+  let stepsHtml = '';
+  if (!stepVisible) {
+    stepsHtml = `<div class="preview-empty-state">Step is hidden based on current classifier selection.</div>`;
+  } else {
+    stepsHtml = step.processSteps.map((ps, num) => {
+      const psVisible = isVisible(ps, { selections: state.preview.classifierSelections, parentVisible: stepVisible, responses: state.preview.responses });
+      if (!psVisible) return `<div class="preview-empty-state">Process step "${escape(ps.title)}" is hidden.</div>`;
+      const ixHtml = ps.interactions.map(ix => {
+        const ixVis = isVisible(ix, { selections: state.preview.classifierSelections, parentVisible: psVisible, responses: state.preview.responses });
+        if (!ixVis) return '';
+        return renderPreviewInteraction(ix);
+      }).join('');
+      const anyVisible = ps.interactions.some(ix => isVisible(ix, { selections: state.preview.classifierSelections, parentVisible: psVisible, responses: state.preview.responses }));
+      return `
+        <div class="preview-ps">
+          <div class="preview-ps-title">
+            <span class="ps-num">${num + 1}</span>
+            <span>${escape(ps.title)}</span>
+          </div>
+          ${anyVisible ? ixHtml : `<div class="preview-empty-state">All interactions in this process step are hidden.</div>`}
+        </div>
+      `;
+    }).join('');
+  }
+
+  modal.innerHTML = `
+    <div class="preview-left">
+      <div class="preview-header">
+        <h3>Preview: ${escape(data.title)}</h3>
+        <button class="kebab" data-action="close-preview">${ICONS.x}</button>
+      </div>
+      <div class="preview-notice">
+        <span>Configure potential user settings to view the document configuration</span>
+        <button class="add-class-prompt" data-action="open-classifiers-panel">${ICONS.plus} ${state.preview.classifiersPanelOpen ? 'CLASSIFIERS PANEL OPEN' : 'ADD CLASSIFIERS'}</button>
+      </div>
+      <div class="preview-body">
+        <div class="preview-doc-title">${escape(step.title)}</div>
+        ${stepsHtml}
+      </div>
+      <div class="preview-footer">
+        <button class="nav-btn" data-action="preview-back" ${navIdx === 0 ? 'disabled style="opacity:.4;cursor:not-allowed"' : ''}>${ICONS.back} BACK</button>
+        <div class="preview-progress">
+          <div>${navIdx + 1}/${navSeq.length}</div>
+          <div class="bar"><div style="width:${((navIdx + 1) / navSeq.length) * 100}%"></div></div>
+        </div>
+        <button class="nav-btn" data-action="preview-next" style="color:var(--primary);font-weight:700" ${navIdx === navSeq.length - 1 ? 'disabled style="opacity:.4;cursor:not-allowed;color:var(--text-mute);font-weight:500"' : ''}>NEXT ${ICONS.chevRight}</button>
+      </div>
+    </div>
+    <div class="preview-right">
+      <div class="preview-right-header">
+        <h3>Classifiers</h3>
+        <button class="kebab" data-action="close-classifiers-panel" title="Hide classifiers panel">${ICONS.x}</button>
+      </div>
+      <div class="preview-right-body">
+        <div class="pref-row">
+          <label><input type="checkbox" ${state.preview.onlyConnected ? 'checked' : ''} data-action="toggle-only-connected"/> Only connected</label>
+          <button class="clear-link" data-action="clear-classifiers">CLEAR SELECTION</button>
+        </div>
+        ${Object.keys(CLASSIFIERS).map(cls => {
+          const disabled = state.preview.onlyConnected && !CONNECTED_CLASSES.has(cls);
+          const selected = (state.preview.classifierSelections[cls] || [])[0] || '';
+          return `
+            <div class="pref-classifier ${disabled ? 'pref-classifier-disabled' : ''}">
+              <span class="pref-classifier-label">${cls}${disabled ? ' (not connected)' : ''}</span>
+              <select data-action="set-classifier" data-class="${cls}">
+                <option value="">—</option>
+                ${CLASSIFIERS[cls].map(v => `<option ${v === selected ? 'selected' : ''}>${v}</option>`).join('')}
+              </select>
+            </div>
+          `;
+        }).join('')}
+        <div style="margin-top:16px;padding:12px;background:var(--surface-2);border-radius:8px;font-size:12px;color:var(--text-mute);line-height:1.5">
+          <strong style="color:var(--text)">Try this:</strong>
+          <ul style="margin:6px 0 0;padding-left:18px">
+            <li>Pick Location: Munich + Machine: GX 500 — Process step "First assessment" becomes visible.</li>
+            <li>Pick Department: D005 — interaction "Enter measured torque" becomes visible.</li>
+            <li>Tap NOK on "Is the engine cover in good condition?" — the governed interaction "Cover bolts torqued correctly" becomes visible.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  `;
+  attachEvents();
+}
+
+function renderPreviewInteraction(ix) {
+  let body = '';
+  if (ix.type === 'thumbsUp') {
+    const r = state.preview.responses[ix.id];
+    body = `
+      <div class="preview-options">
+        ${['OK', 'NOK', 'N/A'].map(opt => `
+          <button class="${r === opt ? 'selected' : ''}" data-action="set-response" data-interaction-id="${ix.id}" data-resp="${opt}">${opt}</button>
+        `).join('')}
+      </div>
+    `;
+  } else if (ix.type === 'pause' || ix.type === 'hash') {
+    body = `<button class="preview-cta">Request information</button>`;
+  } else if (ix.type === 'list') {
+    body = `<select style="width:100%;padding:10px;border:1px solid var(--border-strong);border-radius:8px;font-size:13px"><option>Select option</option><option>Variant A</option><option>Variant B</option></select>`;
+  } else if (ix.type === 'check') {
+    body = `<button class="preview-cta">Confirm</button>
+      <div class="preview-toggle-row"><div class="toggle"></div><span style="font-size:12px;color:var(--text-mute)">N/A</span></div>`;
+  } else {
+    body = `<button class="preview-cta">${ICONS.camera} Add photo</button>`;
+  }
+  return `
+    <div class="preview-interaction">
+      <div class="label">
+        ${escape(ix.label)}
+        ${ix.mandatory ? '<span class="tag tag-mandatory">mandatory</span>' : ''}
+        ${ix.criticality === 'High' ? '<span class="tag tag-critical">critical</span>' : ''}
+      </div>
+      ${body}
+    </div>
+  `;
+}
+
+// ===== Events =====
+function attachEvents() {
+  document.querySelectorAll('[data-tab]').forEach(el => {
+    el.onclick = () => { state.activeTab = el.dataset.tab; render(); };
+  });
+
+  document.querySelectorAll('[data-action="select-step"]').forEach(el => {
+    el.onclick = () => {
+      state.activeStepId = el.dataset.stepId;
+      state.activeModuleId = null;
+      renderPreservingScroll({ resetMain: true });
+    };
+  });
+  document.querySelectorAll('[data-action="select-module"]').forEach(el => {
+    el.onclick = (e) => {
+      if (e.target.closest('[data-action="module-menu"], .module-menu')) return;
+      state.activeModuleId = el.dataset.moduleId;
+      renderPreservingScroll({ resetMain: true });
+    };
+  });
+
+  document.querySelectorAll('[data-action="rename-step"]').forEach(el => {
+    el.oninput = e => {
+      const s = data.steps.find(s => s.id === el.dataset.stepId);
+      if (s) s.title = e.target.value;
+      document.querySelectorAll(`[data-action="select-step"][data-step-id="${el.dataset.stepId}"] .step-title-text`)
+        .forEach(node => node.textContent = e.target.value);
+    };
+  });
+
+  document.querySelectorAll('[data-action="toggle-interaction"]').forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.interactionId;
+      state.expandedInteractions[id] = !state.expandedInteractions[id];
+      renderPreservingScroll();
+    };
+  });
+
+  document.querySelectorAll('[data-action="open-drawer"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const id = el.dataset.targetId;
+      const f = findElement(id);
+      if (!f) return;
+      const v = f.element.visibility;
+      // Read-only when type is governed, OR when element is inside a module.
+      // Inherited is now partially editable: chips can be narrowed, classifiers added back
+      // from the parent's pool, and extra class conditions appended.
+      const ro = !!f.inModule || (v && v.type === 'governed');
+      const sidebar = document.querySelector('.steps-sidebar');
+      const mainPane = document.querySelector('.steps-main');
+      const sidebarScroll = sidebar ? sidebar.scrollTop : 0;
+      const mainScroll = mainPane ? mainPane.scrollTop : 0;
+      state.drawer = { open: true, targetId: id, readOnly: ro, openAddClassifier: null, openOperator: null, draftMode: false };
+      renderDrawer();
+      const sb = document.querySelector('.steps-sidebar');
+      const mp = document.querySelector('.steps-main');
+      if (sb) sb.scrollTop = sidebarScroll;
+      if (mp) mp.scrollTop = mainScroll;
+    };
+  });
+
+  document.querySelectorAll('[data-action="close-drawer"]').forEach(el => {
+    el.onclick = () => { state.drawer.open = false; renderDrawer(); };
+  });
+  document.getElementById('drawerOverlay').onclick = () => { state.drawer.open = false; renderDrawer(); };
+
+  document.querySelectorAll('[data-action="add-visibility"]').forEach(el => {
+    el.onclick = () => {
+      const id = state.drawer.targetId;
+      const f = findElement(id);
+      if (!f) return;
+      const apply = () => {
+        f.element.visibility = { type: 'conditional', rules: [
+          { id: uid('r'), classifier: 'Location', values: ['London'], notShow: false }
+        ]};
+        state.drawer.draftMode = true;
+        renderPreservingScroll();
+      };
+      if ((f.kind === 'step' || f.kind === 'processStep') && hasDescendantWithOwnRules(f.element)) {
+        showConfirm({
+          title: 'Replace existing visibility logic?',
+          message: 'Some of the selected interactions already have visibility logic. Applying this logic will replace their existing rules. Continue?',
+          onConfirm: () => { clearDescendantRules(f.element); apply(); },
+        });
+      } else {
+        apply();
+      }
+    };
+  });
+
+  document.querySelectorAll('[data-action="delete-logic"]').forEach(el => {
+    el.onclick = () => {
+      const id = state.drawer.targetId;
+      const f = findElement(id);
+      if (!f) return;
+      f.element.visibility = { type: 'always' };
+      renderPreservingScroll();
+    };
+  });
+
+  document.querySelectorAll('[data-action="change-rule-class"]').forEach(el => {
+    el.onchange = () => {
+      const rule = findRule(el.dataset.ruleId);
+      if (!rule || rule.locked) return;
+      const newClass = el.value;
+      if (rule.classifier !== newClass) {
+        rule.classifier = newClass;
+        rule.values = [];
+      }
+      renderDrawer();
+    };
+  });
+  document.querySelectorAll('[data-action="delete-rule"]').forEach(el => {
+    el.onclick = () => {
+      const rule = findRule(el.dataset.ruleId);
+      if (rule && rule.locked) return;
+      deleteRule(el.dataset.ruleId);
+      renderPreservingScroll();
+    };
+  });
+  document.querySelectorAll('[data-action="reset-inherited"]').forEach(el => {
+    el.onclick = () => {
+      const id = state.drawer.targetId;
+      const f = findElement(id);
+      if (!f || !f.element.visibility || f.element.visibility.type !== 'inherited') return;
+      delete f.element.visibility.narrowed;
+      delete f.element.visibility.extraRules;
+      renderPreservingScroll();
+      toast('Reset to parent rules');
+    };
+  });
+  document.querySelectorAll('[data-action="remove-rule-value"]').forEach(el => {
+    el.onclick = () => {
+      const ruleId = el.dataset.ruleId;
+      const value = el.dataset.value;
+      // Locked inherited rule — narrow on the element instead
+      if (isLockedInhRuleId(ruleId)) {
+        const f = findElement(state.drawer.targetId);
+        if (!f) return;
+        const effective = buildEffectiveRules(f.element).find(r => r.id === ruleId);
+        if (!effective) return;
+        if (effective.values.length <= 1) { toast('At least one classifier must be selected'); return; }
+        narrowInheritedRule(f.element, ruleId, effective.values.filter(v => v !== value));
+        renderPreservingScroll();
+        return;
+      }
+      const rule = findRule(ruleId);
+      if (!rule) return;
+      if (rule.values.length <= 1) {
+        toast('At least one classifier must be selected');
+        return;
+      }
+      rule.values = rule.values.filter(v => v !== value);
+      renderPreservingScroll();
+    };
+  });
+  document.querySelectorAll('[data-action="toggle-operator-popover"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const id = el.dataset.opId;
+      const op = findOpById(id);
+      if (op && op.locked) return;
+      state.drawer.openOperator = (state.drawer.openOperator === id) ? null : id;
+      renderDrawer();
+    };
+  });
+  document.querySelectorAll('[data-action="set-operator"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const opId = el.dataset.opId;
+      const opValue = el.dataset.opValue;
+      const op = findOpById(opId);
+      if (op && !op.locked) op.op = opValue;
+      state.drawer.openOperator = null;
+      renderPreservingScroll();
+    };
+  });
+
+  document.querySelectorAll('[data-action="add-class-condition"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const f = findElement(state.drawer.targetId);
+      if (!f) return;
+      const v = f.element.visibility;
+      if (!v || (v.type !== 'conditional' && v.type !== 'inherited')) return;
+      const used = new Set();
+      // Avoid duplicating any classifier currently in effect (parent + extras).
+      buildEffectiveRules(f.element).filter(r => !r.op).forEach(r => used.add(r.classifier));
+      const nextClass = Object.keys(CLASSIFIERS).find(c => !used.has(c)) || Object.keys(CLASSIFIERS)[0];
+      const firstValue = (CLASSIFIERS[nextClass] || [])[0];
+      const newRule = { id: uid('r'), classifier: nextClass, values: firstValue ? [firstValue] : [], notShow: false };
+      if (v.type === 'inherited') {
+        if (!v.extraRules) v.extraRules = [];
+        if (v.extraRules.length > 0) v.extraRules.push({ id: uid('op'), op: 'AND' });
+        v.extraRules.push(newRule);
+      } else {
+        if (!v.rules) v.rules = [];
+        if (v.rules.length > 0) v.rules.push({ id: uid('op'), op: 'AND' });
+        v.rules.push(newRule);
+      }
+      renderPreservingScroll();
+    };
+  });
+
+  document.querySelectorAll('[data-action="open-add-classifier"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const id = el.dataset.ruleId;
+      state.drawer.openAddClassifier = (state.drawer.openAddClassifier === id) ? null : id;
+      renderDrawer();
+    };
+  });
+  document.querySelectorAll('[data-action="toggle-rule-value"]').forEach(el => {
+    el.onclick = (e) => e.stopPropagation();
+    el.onchange = (e) => {
+      e.stopPropagation();
+      const ruleId = el.dataset.ruleId;
+      const v = el.dataset.value;
+      // Locked inherited rule — narrow on the element
+      if (isLockedInhRuleId(ruleId)) {
+        const f = findElement(state.drawer.targetId);
+        if (!f) return;
+        const effective = buildEffectiveRules(f.element).find(r => r.id === ruleId);
+        if (!effective) return;
+        let next = [...effective.values];
+        if (el.checked && !next.includes(v)) next.push(v);
+        else if (!el.checked) {
+          if (next.length <= 1) { el.checked = true; toast('At least one classifier must be selected'); return; }
+          next = next.filter(x => x !== v);
+        }
+        narrowInheritedRule(f.element, ruleId, next);
+        renderPreservingScroll();
+        return;
+      }
+      const rule = findRule(ruleId);
+      if (!rule) return;
+      if (el.checked && !rule.values.includes(v)) {
+        rule.values.push(v);
+      } else if (!el.checked) {
+        if (rule.values.length <= 1) {
+          el.checked = true;
+          toast('At least one classifier must be selected');
+          return;
+        }
+        rule.values = rule.values.filter(x => x !== v);
+      }
+      renderPreservingScroll();
+    };
+  });
+  document.querySelectorAll('[data-action="close-add-classifier"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      state.drawer.openAddClassifier = null;
+      renderDrawer();
+    };
+  });
+  document.querySelectorAll('[data-action="popover-stop"]').forEach(el => {
+    el.onclick = (e) => e.stopPropagation();
+  });
+  document.querySelectorAll('[data-action="toggle-not-show"]').forEach(el => {
+    el.onchange = () => {
+      const rule = findRule(el.dataset.ruleId);
+      if (rule) rule.notShow = el.checked;
+      renderPreservingScroll();
+    };
+  });
+
+  document.querySelectorAll('[data-action="save-drawer"]').forEach(el => {
+    el.onclick = () => {
+      state.drawer.draftMode = false;
+      state.drawer.open = false;
+      renderPreservingScroll();
+      toast('Visibility logic saved');
+    };
+  });
+
+  document.querySelectorAll('[data-action="open-preview"]').forEach(el => {
+    el.onclick = () => { state.preview.open = true; renderPreviewModal(); };
+  });
+  document.querySelectorAll('[data-action="close-preview"]').forEach(el => {
+    el.onclick = () => { state.preview.open = false; renderPreviewModal(); };
+  });
+  document.querySelectorAll('[data-action="preview-back"]').forEach(el => {
+    el.onclick = () => {
+      const seq = buildNavigationSequence();
+      const idx = currentNavIndex(seq);
+      if (idx > 0) { navigateToIndex(idx - 1); renderPreviewModal(); render(); }
+    };
+  });
+  document.querySelectorAll('[data-action="preview-next"]').forEach(el => {
+    el.onclick = () => {
+      const seq = buildNavigationSequence();
+      const idx = currentNavIndex(seq);
+      if (idx < seq.length - 1) { navigateToIndex(idx + 1); renderPreviewModal(); render(); }
+    };
+  });
+  document.querySelectorAll('[data-action="close-classifiers-panel"]').forEach(el => {
+    el.onclick = () => { state.preview.classifiersPanelOpen = false; renderPreviewModal(); };
+  });
+  document.querySelectorAll('[data-action="open-classifiers-panel"]').forEach(el => {
+    el.onclick = () => { state.preview.classifiersPanelOpen = true; renderPreviewModal(); };
+  });
+
+  document.querySelectorAll('[data-action="toggle-only-connected"]').forEach(el => {
+    el.onchange = () => { state.preview.onlyConnected = el.checked; renderPreviewModal(); };
+  });
+  document.querySelectorAll('[data-action="clear-classifiers"]').forEach(el => {
+    el.onclick = () => { state.preview.classifierSelections = {}; state.preview.responses = {}; renderPreviewModal(); };
+  });
+  document.querySelectorAll('[data-action="set-classifier"]').forEach(el => {
+    el.onchange = () => {
+      const cls = el.dataset.class;
+      if (el.value === '') delete state.preview.classifierSelections[cls];
+      else state.preview.classifierSelections[cls] = [el.value];
+      renderPreviewModal();
+    };
+  });
+  document.querySelectorAll('[data-action="set-response"]').forEach(el => {
+    el.onclick = () => {
+      state.preview.responses[el.dataset.interactionId] = el.dataset.resp;
+      renderPreviewModal();
+    };
+  });
+
+  document.querySelectorAll('[data-action="remove-structure-value"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const cls = el.dataset.class;
+      const val = el.dataset.value;
+      const restored = removeFromStructure(cls, val);
+      renderPreservingScroll();
+      if (restored) toast(`"${val}" moved back to Inherited classifiers`);
+      else toast(`Removed "${val}" from ${cls}`);
+    };
+  });
+
+  document.querySelectorAll('[data-action="apply-inherited"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const source = el.dataset.source;
+      const cls = el.dataset.class;
+      const val = el.dataset.value;
+      applyInheritedToStructure(source, cls, val);
+      renderPreservingScroll();
+      toast(`Added "${val}" to ${cls}`);
+    };
+  });
+  document.querySelectorAll('[data-action="apply-all-inherited"]').forEach(el => {
+    el.onclick = () => {
+      ['fromSteps', 'fromModules'].forEach(src => {
+        const map = data.inheritedClassifiers[src];
+        Object.keys(map).forEach(cls => {
+          [...map[cls]].forEach(v => applyInheritedToStructure(src, cls, v));
+        });
+      });
+      renderPreservingScroll();
+      toast('All inherited classifiers applied to document');
+    };
+  });
+
+  document.querySelectorAll('[data-action="step-menu"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const id = el.dataset.stepId;
+      Object.keys(state.stepMenus).forEach(k => { if (k !== id) state.stepMenus[k] = false; });
+      Object.keys(state.moduleMenus).forEach(k => { state.moduleMenus[k] = false; });
+      state.stepMenus[id] = !state.stepMenus[id];
+      renderPreservingScroll();
+    };
+  });
+  document.querySelectorAll('[data-action="step-duplicate"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const id = el.dataset.stepId;
+      const idx = data.steps.findIndex(s => s.id === id);
+      if (idx < 0) return;
+      const src = data.steps[idx];
+      const copy = JSON.parse(JSON.stringify(src));
+      copy.id = uid('s');
+      const remap = (el) => { if (el.visibility && el.visibility.rules) el.visibility.rules.forEach(r => { if (r.id) r.id = uid(r.op ? 'op' : 'r'); }); };
+      remap(copy);
+      copy.processSteps.forEach(ps => {
+        ps.id = uid('ps');
+        remap(ps);
+        ps.interactions.forEach(ix => { ix.id = uid('ix'); remap(ix); });
+      });
+      copy.title = src.title + ' (copy)';
+      // Find original step's slot in the document sequence to shift module positions
+      const seq = buildNavigationSequence();
+      const origSlot = seq.findIndex(it => it.kind === 'step' && it.step.id === id) + 1;
+      if (origSlot > 0) {
+        data.modules.forEach(m => { if (m.position > origSlot) m.position++; });
+      }
+      data.steps.splice(idx + 1, 0, copy);
+      state.stepMenus[id] = false;
+      renderPreservingScroll();
+      toast(`Duplicated "${src.title}"`);
+    };
+  });
+  document.querySelectorAll('[data-action="step-delete"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const id = el.dataset.stepId;
+      const step = data.steps.find(s => s.id === id);
+      state.stepMenus[id] = false;
+      renderPreservingScroll();
+      if (!step) return;
+      showConfirm({
+        title: 'Delete this step?',
+        message: `"${step.title}" and all its process steps and interactions will be removed. This cannot be undone.`,
+        confirmLabel: 'Delete',
+        onConfirm: () => {
+          data.steps = data.steps.filter(s => s.id !== id);
+          if (state.activeStepId === id) state.activeStepId = data.steps[0]?.id || null;
+          renderPreservingScroll();
+          toast(`"${step.title}" deleted`);
+        },
+      });
+    };
+  });
+
+  document.querySelectorAll('[data-action="module-menu"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const id = el.dataset.moduleId;
+      Object.keys(state.moduleMenus).forEach(k => { if (k !== id) state.moduleMenus[k] = false; });
+      state.moduleMenus[id] = !state.moduleMenus[id];
+      renderPreservingScroll();
+    };
+  });
+  document.querySelectorAll('[data-action="view-classifiers"]').forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.moduleId;
+      const m = data.modules.find(x => x.id === id);
+      if (!m) return;
+      alert(`Module: ${m.name}\n\nClassifiers (read-only):\n` +
+        Object.entries(m.classifiers).map(([k, v]) => `  ${k}: ${v.join(', ')}`).join('\n'));
+      state.moduleMenus[id] = false; render();
+    };
+  });
+  document.querySelectorAll('[data-action="module-open"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const id = el.dataset.moduleId;
+      state.activeModuleId = id;
+      state.activeStepId = null;
+      state.moduleMenus[id] = false;
+      renderPreservingScroll({ resetMain: true });
+    };
+  });
+  document.querySelectorAll('[data-action="module-unbox"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const id = el.dataset.moduleId;
+      const m = data.modules.find(x => x.id === id);
+      state.moduleMenus[id] = false;
+      renderPreservingScroll();
+      toast(`"${m ? m.name : 'Module'}" would be unboxed (placeholder)`);
+    };
+  });
+  document.querySelectorAll('[data-action="module-view-vis"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const id = el.dataset.moduleId;
+      const m = data.modules.find(x => x.id === id);
+      state.moduleMenus[id] = false;
+      if (!m || !m.step) { renderPreservingScroll(); return; }
+      state.activeModuleId = id;
+      state.activeStepId = null;
+      // Open drawer for the module's step, read-only
+      state.drawer = { open: true, targetId: m.step.id, readOnly: true, openAddClassifier: null, openOperator: null, draftMode: false };
+      renderPreservingScroll({ resetMain: true });
+    };
+  });
+  document.querySelectorAll('[data-action="module-delete"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const id = el.dataset.moduleId;
+      const m = data.modules.find(x => x.id === id);
+      state.moduleMenus[id] = false;
+      renderPreservingScroll();
+      if (!m) return;
+      showConfirm({
+        title: 'Delete this module?',
+        message: `"${m.name}" will be removed from the document. This cannot be undone.`,
+        confirmLabel: 'Delete',
+        onConfirm: () => {
+          data.modules = data.modules.filter(x => x.id !== id);
+          if (state.activeModuleId === id) { state.activeModuleId = null; state.activeStepId = data.steps[0]?.id || null; }
+          render();
+          toast(`"${m.name}" deleted`);
+        },
+      });
+    };
+  });
+
+  attachVisTagTooltips();
+  flipModuleMenusIfNeeded();
+
+  // Close transient popovers when clicking outside
+  document.addEventListener('click', () => {
+    let needsRender = false;
+    let needsDrawerRender = false;
+    let anyOpen = false;
+    Object.values(state.moduleMenus).forEach(v => { if (v) anyOpen = true; });
+    Object.values(state.stepMenus).forEach(v => { if (v) anyOpen = true; });
+    if (anyOpen) { state.moduleMenus = {}; state.stepMenus = {}; needsRender = true; }
+    if (state.drawer.openAddClassifier) { state.drawer.openAddClassifier = null; needsDrawerRender = true; }
+    if (state.drawer.openOperator) { state.drawer.openOperator = null; needsDrawerRender = true; }
+    if (needsRender) render();
+    else if (needsDrawerRender) renderDrawer();
+  }, { once: true });
+}
+
+// For inherited elements, derive the effective rules on demand by combining
+// the parent's current rules (read fresh each call) with this element's
+// narrowed values and extra rules. This way any change to the parent's logic
+// is automatically reflected in the child.
+function buildEffectiveRules(element) {
+  const v = element.visibility;
+  if (!v) return [];
+  if (v.type === 'conditional') return v.rules || [];
+  if (v.type !== 'inherited') return [];
+  const owner = findVisibilityOwner(element);
+  const narrowed = v.narrowed || {};
+  const extraRules = v.extraRules || [];
+  if (!owner || !owner.element.visibility || owner.element.visibility.type !== 'conditional') {
+    return extraRules;
+  }
+  const parentRules = owner.element.visibility.rules;
+  const effective = parentRules.map(r => {
+    if (r.op) return { id: 'inh-op-' + r.id, op: r.op, locked: true };
+    return {
+      id: 'inh-rule-' + r.id,
+      classifier: r.classifier,
+      values: narrowed[r.classifier] ? [...narrowed[r.classifier]] : [...r.values],
+      allowedValues: [...r.values],
+      notShow: !!r.notShow,
+      locked: true,
+    };
+  });
+  if (effective.length > 0 && extraRules.length > 0) {
+    effective.push({ id: 'inh-bridge', op: 'AND', locked: true });
+  }
+  return effective.concat(extraRules);
+}
+
+function isLockedInhRuleId(id) { return typeof id === 'string' && id.startsWith('inh-rule-'); }
+function isLockedInhOpId(id) { return typeof id === 'string' && (id.startsWith('inh-op-') || id === 'inh-bridge'); }
+
+function narrowInheritedRule(element, lockedRuleId, newValues) {
+  const v = element.visibility;
+  if (v.type !== 'inherited') return;
+  // Look up the parent rule by stripping the prefix
+  const owner = findVisibilityOwner(element);
+  if (!owner) return;
+  const parentRule = owner.element.visibility.rules.find(r => r.id === lockedRuleId.replace('inh-rule-', ''));
+  if (!parentRule) return;
+  if (!v.narrowed) v.narrowed = {};
+  // If the new values match the parent's exactly, remove the narrowing entry.
+  const parentSet = new Set(parentRule.values);
+  if (newValues.length === parentRule.values.length && newValues.every(x => parentSet.has(x))) {
+    delete v.narrowed[parentRule.classifier];
+  } else {
+    v.narrowed[parentRule.classifier] = newValues.filter(x => parentSet.has(x));
+  }
+}
+
+function findOpById(opId) {
+  if (isLockedInhOpId(opId)) return { op: 'AND', locked: true }; // not directly modifiable
+  const collect = (v) => {
+    const arr = [];
+    if (!v) return arr;
+    if (v.rules) arr.push(...v.rules);
+    if (v.extraRules) arr.push(...v.extraRules);
+    return arr;
+  };
+  const allSteps = [...data.steps, ...data.modules.filter(m => m.step).map(m => m.step)];
+  for (const step of allSteps) {
+    let op = collect(step.visibility).find(r => r.id === opId && r.op);
+    if (op) return op;
+    for (const ps of step.processSteps) {
+      op = collect(ps.visibility).find(r => r.id === opId && r.op);
+      if (op) return op;
+      for (const ix of ps.interactions) {
+        op = collect(ix.visibility).find(r => r.id === opId && r.op);
+        if (op) return op;
+      }
+    }
+  }
+  return null;
+}
+
+function findRule(ruleId) {
+  if (isLockedInhRuleId(ruleId)) return null; // locked synthetic rules aren't directly modifiable
+  const collect = (v) => {
+    const arr = [];
+    if (!v) return arr;
+    if (v.rules) arr.push(...v.rules);
+    if (v.extraRules) arr.push(...v.extraRules);
+    return arr;
+  };
+  const allSteps = [...data.steps, ...data.modules.filter(m => m.step).map(m => m.step)];
+  for (const step of allSteps) {
+    let r = collect(step.visibility).find(r => r.id === ruleId);
+    if (r) return r;
+    for (const ps of step.processSteps) {
+      r = collect(ps.visibility).find(r => r.id === ruleId);
+      if (r) return r;
+      for (const ix of ps.interactions) {
+        r = collect(ix.visibility).find(r => r.id === ruleId);
+        if (r) return r;
+      }
+    }
+  }
+  return null;
+}
+
+function deleteRule(ruleId) {
+  // Look in both v.rules (conditional) and v.extraRules (inherited extras).
+  const allVis = [];
+  const allSteps = [...data.steps, ...data.modules.filter(m => m.step).map(m => m.step)];
+  for (const step of allSteps) {
+    if (step.visibility) allVis.push(step.visibility);
+    for (const ps of step.processSteps) {
+      if (ps.visibility) allVis.push(ps.visibility);
+      for (const ix of ps.interactions) if (ix.visibility) allVis.push(ix.visibility);
+    }
+  }
+  for (const vis of allVis) {
+    for (const key of ['rules', 'extraRules']) {
+      const arr = vis[key];
+      if (!arr) continue;
+      const idx = arr.findIndex(r => r.id === ruleId);
+      if (idx < 0) continue;
+      arr.splice(idx, 1);
+      if (idx > 0 && arr[idx - 1] && arr[idx - 1].op) arr.splice(idx - 1, 1);
+      else if (arr[idx] && arr[idx].op) arr.splice(idx, 1);
+      if (key === 'rules') {
+        if (arr.filter(r => !r.op).length === 0) {
+          vis.type = 'always';
+          delete vis.rules;
+        }
+      } else {
+        if (arr.length === 0) delete vis.extraRules;
+      }
+      return;
+    }
+  }
+}
+
+function renderPreservingScroll(opts) {
+  opts = opts || {};
+  const scrollables = ['.info-layout', '.modules-layout', '.steps-main', '.steps-sidebar'];
+  const saved = {};
+  scrollables.forEach(sel => {
+    const node = document.querySelector(sel);
+    if (node) saved[sel] = node.scrollTop;
+  });
+  if (opts.resetMain) saved['.steps-main'] = 0;
+  render();
+  scrollables.forEach(sel => {
+    const node = document.querySelector(sel);
+    if (node && saved[sel] != null) node.scrollTop = saved[sel];
+  });
+}
+
+function applyInheritedToStructure(source, cls, value) {
+  if (!data.structureClasses[cls]) data.structureClasses[cls] = [];
+  if (!data.structureClasses[cls].includes(value)) data.structureClasses[cls].push(value);
+  const src = data.inheritedClassifiers[source];
+  if (src && src[cls]) {
+    src[cls] = src[cls].filter(v => v !== value);
+    if (src[cls].length === 0) delete src[cls];
+  }
+  if (!data.appliedFromInherited[cls]) data.appliedFromInherited[cls] = {};
+  data.appliedFromInherited[cls][value] = source;
+}
+
+function removeFromStructure(cls, value) {
+  if (data.structureClasses[cls]) {
+    data.structureClasses[cls] = data.structureClasses[cls].filter(v => v !== value);
+    if (data.structureClasses[cls].length === 0) delete data.structureClasses[cls];
+  }
+  const tracked = data.appliedFromInherited[cls] && data.appliedFromInherited[cls][value];
+  if (tracked) {
+    const bucket = data.inheritedClassifiers[tracked];
+    if (!bucket[cls]) bucket[cls] = [];
+    if (!bucket[cls].includes(value)) bucket[cls].push(value);
+    delete data.appliedFromInherited[cls][value];
+    if (Object.keys(data.appliedFromInherited[cls]).length === 0) delete data.appliedFromInherited[cls];
+    return tracked;
+  }
+  return null;
+}
+
+function hasDescendantWithOwnRules(element) {
+  for (const step of data.steps) {
+    if (step.id === element.id) {
+      for (const ps of step.processSteps) {
+        if (ps.visibility && (ps.visibility.type === 'conditional' || ps.visibility.type === 'governed')) return true;
+        for (const ix of ps.interactions) {
+          if (ix.visibility && (ix.visibility.type === 'conditional' || ix.visibility.type === 'governed')) return true;
+        }
+      }
+      return false;
+    }
+    for (const ps of step.processSteps) {
+      if (ps.id === element.id) {
+        for (const ix of ps.interactions) {
+          if (ix.visibility && (ix.visibility.type === 'conditional' || ix.visibility.type === 'governed')) return true;
+        }
+        return false;
+      }
+    }
+  }
+  return false;
+}
+
+function clearDescendantRules(element) {
+  for (const step of data.steps) {
+    if (step.id === element.id) {
+      for (const ps of step.processSteps) {
+        ps.visibility = { type: 'always' };
+        for (const ix of ps.interactions) ix.visibility = { type: 'always' };
+      }
+      return;
+    }
+    for (const ps of step.processSteps) {
+      if (ps.id === element.id) {
+        for (const ix of ps.interactions) ix.visibility = { type: 'always' };
+        return;
+      }
+    }
+  }
+}
+
+function showConfirm({ title, message, onConfirm, confirmLabel, destructive }) {
+  const overlay = document.getElementById('confirmOverlay');
+  const okBtn = document.getElementById('confirmOk');
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMessage').textContent = message;
+  okBtn.textContent = confirmLabel || 'Continue';
+  okBtn.classList.toggle('btn-danger', !!destructive);
+  overlay.classList.add('show');
+  const close = () => overlay.classList.remove('show');
+  document.getElementById('confirmCancel').onclick = close;
+  okBtn.onclick = () => { close(); onConfirm(); };
+}
+
+function flipModuleMenusIfNeeded() {
+  document.querySelectorAll('.module-menu.show').forEach(menu => {
+    menu.classList.remove('above');
+    const rect = menu.getBoundingClientRect();
+    const viewportH = window.innerHeight;
+    // If menu's bottom edge exceeds the viewport (with 12px buffer), flip above
+    if (rect.bottom > viewportH - 12) {
+      menu.classList.add('above');
+    }
+  });
+}
+
+function attachVisTagTooltips() {
+  const tooltip = document.getElementById('globalTooltip');
+  if (!tooltip) return;
+  document.querySelectorAll('.vis-tag.conditional[data-tip]').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      tooltip.textContent = el.dataset.tip || '';
+      tooltip.classList.add('show');
+      positionTooltip(el, tooltip);
+    });
+    el.addEventListener('mouseleave', () => {
+      tooltip.classList.remove('show');
+      tooltip.style.transform = 'translate(-9999px, -9999px)';
+    });
+  });
+}
+
+function positionTooltip(target, tooltip) {
+  // First put it off-screen but visible to measure size
+  tooltip.style.transform = 'translate(-9999px, -9999px)';
+  requestAnimationFrame(() => {
+    const rect = target.getBoundingClientRect();
+    const tw = tooltip.offsetWidth;
+    const th = tooltip.offsetHeight;
+    const padding = 8;
+    let left = rect.left + rect.width / 2 - tw / 2;
+    let top = rect.top - th - 10;
+    if (left < padding) left = padding;
+    if (left + tw > window.innerWidth - padding) left = window.innerWidth - tw - padding;
+    if (top < padding) top = rect.bottom + 10;
+    tooltip.style.transform = `translate(${left}px, ${top}px)`;
+  });
+}
+
+function toast(msg) {
+  const t = document.getElementById('demoToast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+function escape(str) {
+  if (str == null) return '';
+  return String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
+}
+
+// ===== Boot =====
+render();
+</script>
+</body>
+</html>
