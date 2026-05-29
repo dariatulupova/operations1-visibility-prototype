@@ -572,14 +572,14 @@ const ICONS = {
 const CLASSIFIERS = {
   'Location': ['London', 'Munich', 'Madrid', 'Paris', 'Berlin', 'Frankfurt', 'Amsterdam'],
   'Machine': ['GX 450', 'GX 500', 'GX 550', 'GX 700', 'HX 100'],
-  'Business Unit': ['Industrial', 'Consumer', 'Medical'],
+  'Business Unit': ['Industrial', 'Consumer', 'Medical', 'Automotive', 'Aerospace', 'Energy'],
   'Department': ['D005', 'A5695', 'H7678', 'K5683', 'E4573', 'Y5688'],
-  'Production area': ['Line A', 'Line B', 'Line C'],
-  'Device type': ['Robot arm', 'CNC', 'Conveyor'],
-  'Module': ['M1', 'M2', 'M3'],
-  'Assembly group': ['Group A', 'Group B'],
-  'Material': ['Steel', 'Aluminum', 'Plastic'],
-  'Characteristic value': ['Low', 'Medium', 'High'],
+  'Production area': ['Line A', 'Line B', 'Line C', 'Line D', 'Assembly hall', 'Packaging'],
+  'Device type': ['Robot arm', 'CNC', 'Conveyor', 'Press', 'Welding cell', 'Inspection bench'],
+  'Module': ['M1', 'M2', 'M3', 'M4', 'M5', 'M6'],
+  'Assembly group': ['Group A', 'Group B', 'Group C', 'Group D', 'Group E'],
+  'Material': ['Steel', 'Aluminum', 'Plastic', 'Brass', 'Titanium', 'Carbon fiber'],
+  'Characteristic value': ['Low', 'Medium', 'High', 'Critical', 'Standard', 'Premium'],
   'Order': ['C045', 'A5695', 'KJ8690', 'RF4783', 'VF4673'],
 };
 
@@ -593,7 +593,7 @@ let state = {
   activeTab: 'steps',
   activeStepId: 's1',
   activeModuleId: null,
-  drawer: { open: false, targetId: null, readOnly: false, openAddClassifier: null, openOperator: null, draftMode: false },
+  drawer: { open: false, targetId: null, readOnly: false, openAddClassifier: null, openOperator: null, draftMode: false, draftSnapshot: null },
   preview: { open: false, classifierSelections: {}, onlyConnected: true, responses: {}, classifiersPanelOpen: true },
   moduleMenus: {},
   stepMenus: {},
@@ -1585,7 +1585,7 @@ function renderDrawer() {
     <div class="drawer-header">
       <h3>Visibility logic</h3>
       <div class="drawer-header-actions">
-        ${state.drawer.draftMode ? `<button class="btn btn-primary" style="padding:6px 14px" data-action="save-drawer">Save</button>` : ''}
+        ${state.drawer.draftMode ? `<button class="btn btn-primary" style="padding:6px 14px${hasEmptyRules(el) ? ';opacity:.4;cursor:not-allowed' : ''}" data-action="save-drawer" ${hasEmptyRules(el) ? 'disabled' : ''}>Save</button>` : ''}
         <button class="kebab" data-action="close-drawer" data-tip="Close">${ICONS.x}</button>
       </div>
     </div>
@@ -1756,10 +1756,12 @@ function renderConditionalEditor(rules) {
     });
   });
 
+  const drawerEl = state.drawer.targetId ? findElement(state.drawer.targetId) : null;
+  const blockedByEmpty = drawerEl ? hasEmptyRules(drawerEl.element) : false;
   html += `
     <div class="add-class-cond-row">
       <span class="add-class-cond-line"></span>
-      <button class="add-class-cond-btn" data-action="add-class-condition">${ICONS.plus} ADD CLASS CONDITION</button>
+      <button class="add-class-cond-btn" data-action="add-class-condition" ${blockedByEmpty ? 'disabled style="opacity:.4;cursor:not-allowed"' : ''}>${ICONS.plus} ADD CLASS CONDITION</button>
       <span class="add-class-cond-line"></span>
     </div>
   `;
@@ -1962,10 +1964,20 @@ function attachEvents() {
     };
   });
 
+  function closeDrawerWithDraftRevert() {
+    if (state.drawer.draftMode && state.drawer.draftSnapshot) {
+      const f = findElement(state.drawer.targetId);
+      if (f) f.element.visibility = state.drawer.draftSnapshot;
+    }
+    state.drawer.open = false;
+    state.drawer.draftMode = false;
+    state.drawer.draftSnapshot = null;
+    renderPreservingScroll();
+  }
   document.querySelectorAll('[data-action="close-drawer"]').forEach(el => {
-    el.onclick = () => { state.drawer.open = false; renderDrawer(); };
+    el.onclick = closeDrawerWithDraftRevert;
   });
-  document.getElementById('drawerOverlay').onclick = () => { state.drawer.open = false; renderDrawer(); };
+  document.getElementById('drawerOverlay').onclick = closeDrawerWithDraftRevert;
 
   document.querySelectorAll('[data-action="add-visibility"]').forEach(el => {
     el.onclick = () => {
@@ -1973,8 +1985,9 @@ function attachEvents() {
       const f = findElement(id);
       if (!f) return;
       const apply = () => {
+        state.drawer.draftSnapshot = JSON.parse(JSON.stringify(f.element.visibility || { type: 'always' }));
         f.element.visibility = { type: 'conditional', rules: [
-          { id: uid('r'), classifier: 'Location', values: ['London'], notShow: false }
+          { id: uid('r'), classifier: 'Location', values: [], notShow: false }
         ]};
         state.drawer.draftMode = true;
         renderPreservingScroll();
@@ -2158,12 +2171,15 @@ function attachEvents() {
       if (!f) return;
       const v = f.element.visibility;
       if (!v || (v.type !== 'conditional' && v.type !== 'inherited')) return;
+      if (hasEmptyRules(f.element)) {
+        toast('Add at least one classifier to the existing class first');
+        return;
+      }
       const used = new Set();
       // Avoid duplicating any classifier currently in effect (parent + extras).
       buildEffectiveRules(f.element).filter(r => !r.op).forEach(r => used.add(r.classifier));
       const nextClass = Object.keys(CLASSIFIERS).find(c => !used.has(c)) || Object.keys(CLASSIFIERS)[0];
-      const firstValue = (CLASSIFIERS[nextClass] || [])[0];
-      const newRule = { id: uid('r'), classifier: nextClass, values: firstValue ? [firstValue] : [], notShow: false };
+      const newRule = { id: uid('r'), classifier: nextClass, values: [], notShow: false };
       if (v.type === 'inherited') {
         if (!v.extraRules) v.extraRules = [];
         if (v.extraRules.length > 0) v.extraRules.push({ id: uid('op'), op: 'AND' });
@@ -2243,6 +2259,7 @@ function attachEvents() {
   document.querySelectorAll('[data-action="save-drawer"]').forEach(el => {
     el.onclick = () => {
       state.drawer.draftMode = false;
+      state.drawer.draftSnapshot = null;
       state.drawer.open = false;
       renderPreservingScroll();
       toast('Visibility logic saved');
@@ -2708,6 +2725,15 @@ function clearDescendantRules(element) {
       }
     }
   }
+}
+
+function hasEmptyRules(element) {
+  if (!element || !element.visibility) return false;
+  const v = element.visibility;
+  let rules = [];
+  if (v.type === 'conditional') rules = v.rules || [];
+  else if (v.type === 'inherited') rules = v.extraRules || [];
+  return rules.some(r => !r.op && (!r.values || r.values.length === 0));
 }
 
 function effectiveRulesAsConditional(element) {
