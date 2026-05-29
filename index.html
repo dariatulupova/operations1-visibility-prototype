@@ -488,6 +488,14 @@
   .confirm-card h3 { margin: 0 0 10px; font-size: 17px; font-weight: 700; }
   .confirm-card p { margin: 0 0 20px; color: var(--text-mute); font-size: 14px; line-height: 1.5; }
   .confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
+  #confirmChoices { display: none; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+  #confirmChoices.show { display: flex; }
+  .confirm-choice { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1.5px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 13px; line-height: 1.5; transition: border-color .12s, background-color .12s; }
+  .confirm-choice:hover { border-color: var(--border-strong); }
+  .confirm-choice.selected { border-color: var(--primary); background: var(--primary-soft); }
+  .confirm-choice input { margin-top: 3px; flex-shrink: 0; cursor: pointer; }
+  .confirm-choice-text { flex: 1; color: var(--text-mute); }
+  .confirm-choice-text strong { font-weight: 600; color: var(--text); }
 </style>
 </head>
 <body>
@@ -522,6 +530,7 @@
   <div class="confirm-card">
     <h3 id="confirmTitle"></h3>
     <p id="confirmMessage"></p>
+    <div id="confirmChoices"></div>
     <div class="confirm-actions">
       <button class="btn btn-ghost" id="confirmCancel">Cancel</button>
       <button class="btn btn-primary" id="confirmOk">Continue</button>
@@ -1987,8 +1996,80 @@ function attachEvents() {
       const id = state.drawer.targetId;
       const f = findElement(id);
       if (!f) return;
-      f.element.visibility = { type: 'always' };
-      renderPreservingScroll();
+
+      if (f.kind === 'interaction') {
+        showConfirm({
+          title: 'Delete visibility logic?',
+          message: 'This action cannot be undone.',
+          confirmLabel: 'Confirm',
+          onConfirm: () => {
+            deleteLogicFromInteraction(f.element);
+            renderPreservingScroll();
+          },
+        });
+        return;
+      }
+
+      if (f.kind === 'processStep') {
+        const hasInherited = f.element.interactions.some(ix => ix.visibility && ix.visibility.type === 'inherited');
+        if (!hasInherited) {
+          showConfirm({
+            title: 'Delete visibility logic?',
+            message: 'This action cannot be undone.',
+            confirmLabel: 'Confirm',
+            onConfirm: () => {
+              f.element.visibility = { type: 'always' };
+              renderPreservingScroll();
+            },
+          });
+          return;
+        }
+        showConfirm({
+          title: 'Delete visibility logic from process step?',
+          message: 'This process step has visibility logic applied to its interactions. How would you like to proceed?',
+          confirmLabel: 'Confirm',
+          defaultChoiceIndex: 1,
+          choices: [
+            { value: 'all', label: 'Delete from all interactions', description: 'Visibility logic will be deleted from the process step and all interactions inside. All interactions will become "Always visible".' },
+            { value: 'keep', label: 'Keep on interactions', description: 'Visibility logic will be deleted from the process step, but each interaction will keep its current logic. You can edit them individually.' },
+          ],
+          onConfirm: (choice) => {
+            deleteLogicFromProcessStep(f.element, choice);
+            renderPreservingScroll();
+          },
+        });
+        return;
+      }
+
+      if (f.kind === 'step') {
+        const hasInherited = f.element.processSteps.some(ps => ps.visibility && ps.visibility.type === 'inherited');
+        if (!hasInherited) {
+          showConfirm({
+            title: 'Delete visibility logic?',
+            message: 'This action cannot be undone.',
+            confirmLabel: 'Confirm',
+            onConfirm: () => {
+              f.element.visibility = { type: 'always' };
+              renderPreservingScroll();
+            },
+          });
+          return;
+        }
+        showConfirm({
+          title: 'Delete visibility logic from step?',
+          message: 'This step has visibility logic applied to its process steps and interactions. How would you like to proceed?',
+          confirmLabel: 'Confirm',
+          defaultChoiceIndex: 1,
+          choices: [
+            { value: 'all', label: 'Delete from all process steps and interactions', description: 'Visibility logic will be deleted from the step and everything inside. All elements will become "Always visible".' },
+            { value: 'keep', label: 'Keep on process steps and interactions', description: 'Visibility logic will be deleted from the step, but each process step and interaction will keep its current logic. You can edit them individually.' },
+          ],
+          onConfirm: (choice) => {
+            deleteLogicFromStep(f.element, choice);
+            renderPreservingScroll();
+          },
+        });
+      }
     };
   });
 
@@ -2629,17 +2710,122 @@ function clearDescendantRules(element) {
   }
 }
 
-function showConfirm({ title, message, onConfirm, confirmLabel, destructive }) {
+function effectiveRulesAsConditional(element) {
+  const effective = buildEffectiveRules(element);
+  return effective.map(r => {
+    if (r.op) return { id: uid('op'), op: r.op };
+    return { id: uid('r'), classifier: r.classifier, values: [...r.values], notShow: !!r.notShow };
+  });
+}
+
+function deleteLogicFromInteraction(ix) {
+  ix.visibility = { type: 'always' };
+}
+
+function deleteLogicFromProcessStep(ps, mode) {
+  if (mode === 'keep') {
+    // Snapshot each interaction's effective rules BEFORE detaching the PS
+    const ixRules = new Map();
+    for (const ix of ps.interactions) {
+      if (ix.visibility && ix.visibility.type === 'inherited') {
+        ixRules.set(ix.id, effectiveRulesAsConditional(ix));
+      }
+    }
+    ps.visibility = { type: 'always' };
+    for (const ix of ps.interactions) {
+      if (ixRules.has(ix.id)) {
+        ix.visibility = { type: 'conditional', rules: ixRules.get(ix.id) };
+      } else {
+        ix.visibility = ix.visibility || { type: 'always' };
+      }
+    }
+  } else {
+    ps.visibility = { type: 'always' };
+    for (const ix of ps.interactions) ix.visibility = { type: 'always' };
+  }
+}
+
+function deleteLogicFromStep(step, mode) {
+  if (mode === 'keep') {
+    // Snapshot effective rules for every descendant that's currently inherited
+    const psRules = new Map();
+    const ixRules = new Map();
+    for (const ps of step.processSteps) {
+      if (ps.visibility && ps.visibility.type === 'inherited') {
+        psRules.set(ps.id, effectiveRulesAsConditional(ps));
+      }
+      for (const ix of ps.interactions) {
+        if (ix.visibility && ix.visibility.type === 'inherited') {
+          ixRules.set(ix.id, effectiveRulesAsConditional(ix));
+        }
+      }
+    }
+    step.visibility = { type: 'always' };
+    for (const ps of step.processSteps) {
+      if (psRules.has(ps.id)) {
+        ps.visibility = { type: 'conditional', rules: psRules.get(ps.id) };
+      }
+      for (const ix of ps.interactions) {
+        if (ixRules.has(ix.id) && ix.visibility && ix.visibility.type === 'inherited') {
+          // It now inherits from the materialised PS — leave as inherited.
+        } else if (ixRules.has(ix.id)) {
+          ix.visibility = { type: 'conditional', rules: ixRules.get(ix.id) };
+        }
+      }
+    }
+  } else {
+    step.visibility = { type: 'always' };
+    for (const ps of step.processSteps) {
+      ps.visibility = { type: 'always' };
+      for (const ix of ps.interactions) ix.visibility = { type: 'always' };
+    }
+  }
+}
+
+function showConfirm({ title, message, onConfirm, confirmLabel, destructive, choices, defaultChoiceIndex }) {
   const overlay = document.getElementById('confirmOverlay');
   const okBtn = document.getElementById('confirmOk');
+  const choicesEl = document.getElementById('confirmChoices');
   document.getElementById('confirmTitle').textContent = title;
   document.getElementById('confirmMessage').textContent = message;
   okBtn.textContent = confirmLabel || 'Continue';
   okBtn.classList.toggle('btn-danger', !!destructive);
+
+  if (choices && choices.length) {
+    const idx = defaultChoiceIndex ?? 0;
+    choicesEl.classList.add('show');
+    choicesEl.innerHTML = choices.map((c, i) => `
+      <label class="confirm-choice ${i === idx ? 'selected' : ''}" data-choice-index="${i}">
+        <input type="radio" name="confirm-choice" value="${i}" ${i === idx ? 'checked' : ''} />
+        <span class="confirm-choice-text"><strong>${escape(c.label)}.</strong> ${escape(c.description || '')}</span>
+      </label>
+    `).join('');
+    choicesEl.querySelectorAll('.confirm-choice').forEach(el => {
+      el.onclick = () => {
+        choicesEl.querySelectorAll('.confirm-choice').forEach(c => c.classList.remove('selected'));
+        el.classList.add('selected');
+        const input = el.querySelector('input');
+        if (input) input.checked = true;
+      };
+    });
+  } else {
+    choicesEl.classList.remove('show');
+    choicesEl.innerHTML = '';
+  }
+
   overlay.classList.add('show');
   const close = () => overlay.classList.remove('show');
   document.getElementById('confirmCancel').onclick = close;
-  okBtn.onclick = () => { close(); onConfirm(); };
+  okBtn.onclick = () => {
+    close();
+    let choiceValue = null;
+    if (choices && choices.length) {
+      const checked = choicesEl.querySelector('input[name="confirm-choice"]:checked');
+      const i = checked ? parseInt(checked.value) : (defaultChoiceIndex ?? 0);
+      choiceValue = choices[i].value;
+    }
+    onConfirm(choiceValue);
+  };
 }
 
 function flipModuleMenusIfNeeded() {
