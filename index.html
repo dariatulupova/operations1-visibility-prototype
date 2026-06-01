@@ -251,7 +251,8 @@
   .drawer-empty p { margin: 0; }
 
   .drawer-top-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-  .drawer-top-row .danger-link { color: var(--red-text); font-size: 12px; font-weight: 700; letter-spacing: .5px; }
+  .drawer-top-row .danger-link { color: var(--text-mute); font-size: 12px; font-weight: 700; letter-spacing: .5px; }
+  .drawer-top-row .danger-link:hover { color: var(--text); }
 
   .class-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 8px; position: relative; transition: border-color .15s, background-color .15s; }
   .class-card.not-show { border-color: #FBBFBF; background: #fff7f7; }
@@ -264,7 +265,7 @@
   .class-card-select label { position: absolute; top: -7px; left: 10px; background: white; padding: 0 4px; font-size: 11px; line-height: 1; color: var(--text-mute); z-index: 2; }
   .class-card-select select { width: 100%; padding: 12px 12px 8px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 13px; appearance: none; background: white url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236a7282' viewBox='0 0 16 16'><path d='M4 6l4 4 4-4'/></svg>") no-repeat right 8px center; }
   .class-card-del { width: 36px; height: 36px; border-radius: 6px; color: var(--text-mute); display: inline-flex; align-items: center; justify-content: center; }
-  .class-card-del:hover { background: var(--bg); color: var(--red-text); }
+  .class-card-del:hover { background: var(--bg); }
 
   .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
   .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: white; border: 1px solid var(--border-strong); font-size: 12px; }
@@ -597,7 +598,7 @@ let state = {
   preview: { open: false, classifierSelections: {}, onlyConnected: true, responses: {}, classifiersPanelOpen: true },
   moduleMenus: {},
   stepMenus: {},
-  expandedInteractions: { 'i1-2': true },
+  expandedInteractions: {},
 };
 
 const data = {
@@ -748,9 +749,7 @@ const data = {
       classifiers: { Department: ['E4573', 'Y5688'], Location: ['Amsterdam', 'Munich'] },
       step: {
         id: 'm1-step', title: 'Calibration setup',
-        visibility: { type: 'conditional', rules: [
-          { id: uid('r'), classifier: 'Business Unit', values: ['Industrial', 'Consumer'], notShow: false },
-        ]},
+        visibility: { type: 'always' },
         processSteps: [
           {
             id: 'm1-ps-1', title: 'Prepare calibration jig',
@@ -827,11 +826,7 @@ const data = {
           },
           {
             id: 'm3-ps-2', title: 'Attach sub-assembly',
-            visibility: { type: 'conditional', rules: [
-              { id: uid('r'), classifier: 'Department', values: ['D005', 'A5695'], notShow: false },
-              { id: uid('op'), op: 'AND' },
-              { id: uid('r'), classifier: 'Production area', values: ['Line A', 'Line B'], notShow: false },
-            ]},
+            visibility: { type: 'always' },
             attachments: [],
             interactions: [
               { id: 'm3-ix-4', type: 'check', label: 'Insert sub-assembly into bracket', mandatory: true, visibility: { type: 'always' } },
@@ -856,10 +851,7 @@ const data = {
             interactions: [
               { id: 'm4-ix-1', type: 'thumbsUp', label: 'All connectors fully seated?', mandatory: true, response: 'OK', criticality: 'High', visibility: { type: 'always' } },
               { id: 'm4-ix-2', type: 'check', label: 'No visible damage to PCB', mandatory: true, visibility: { type: 'always' } },
-              { id: 'm4-ix-3', type: 'list', label: 'Inspection result', mandatory: true, dropdown: false, single: true,
-                visibility: { type: 'conditional', rules: [
-                  { id: uid('r'), classifier: 'Material', values: ['Steel', 'Aluminum'], notShow: false },
-                ]} },
+              { id: 'm4-ix-3', type: 'list', label: 'Inspection result', mandatory: true, dropdown: false, single: true, visibility: { type: 'always' } },
             ],
           },
         ],
@@ -1600,7 +1592,7 @@ function renderDrawer() {
       ${(v.type === 'inherited') ? `
         <div class="drawer-top-row">
           <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" checked /> Only connected classifiers</label>
-          <button class="danger-link" data-action="reset-inherited">RESET TO PARENT</button>
+          <button class="danger-link" data-action="reset-inherited" ${!hasInheritedOverrides(el) ? 'disabled style="opacity:.4;cursor:not-allowed"' : ''}>RESET TO PARENT</button>
         </div>
       ` : ''}
       ${logicHtml}
@@ -2111,6 +2103,7 @@ function attachEvents() {
       const id = state.drawer.targetId;
       const f = findElement(id);
       if (!f || !f.element.visibility || f.element.visibility.type !== 'inherited') return;
+      if (!hasInheritedOverrides(f.element)) return;
       delete f.element.visibility.narrowed;
       delete f.element.visibility.extraRules;
       renderPreservingScroll();
@@ -2725,6 +2718,14 @@ function clearDescendantRules(element) {
       }
     }
   }
+}
+
+function hasInheritedOverrides(element) {
+  const v = element && element.visibility;
+  if (!v || v.type !== 'inherited') return false;
+  const hasNarrowed = v.narrowed && Object.keys(v.narrowed).length > 0;
+  const hasExtras = v.extraRules && v.extraRules.length > 0;
+  return !!(hasNarrowed || hasExtras);
 }
 
 function hasEmptyRules(element) {
