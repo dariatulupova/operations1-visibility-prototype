@@ -1981,14 +1981,14 @@ function attachEvents() {
   document.querySelectorAll('[data-action="start-selection-mode"]').forEach(el => {
     el.onclick = () => {
       state.selectionMode = { active: true, selected: new Set() };
-      render();
+      renderPreservingScroll();
       toast('Tap elements to select. Modules and inherited items follow their parent.');
     };
   });
   document.querySelectorAll('[data-action="cancel-selection-mode"]').forEach(el => {
     el.onclick = () => {
       state.selectionMode = { active: false, selected: null };
-      render();
+      renderPreservingScroll();
     };
   });
   document.querySelectorAll('[data-action="select-toggle"]').forEach(el => {
