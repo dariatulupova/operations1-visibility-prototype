@@ -481,6 +481,44 @@
 
   /* small helper for tooltip-like badge near "Always visible" demo */
   .demo-toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: #1c2330; color: white; padding: 10px 16px; border-radius: 8px; font-size: 13px; z-index: 50; opacity: 0; pointer-events: none; transition: opacity .2s; box-shadow: 0 8px 24px rgba(20,30,60,.18); }
+
+  /* Selection mode */
+  .selection-mode .topbar-actions,
+  .selection-mode .tabs,
+  .selection-mode .tabs-meta,
+  .selection-mode .add-step-btn,
+  .selection-mode .step-kebab,
+  .selection-mode .module-block,
+  .selection-mode .ps-attach,
+  .selection-mode .checkbox-pill,
+  .selection-mode .chev,
+  .selection-mode .add-ps-row,
+  .selection-mode .block-nav-row,
+  .selection-mode .step-item .step-num,
+  .selection-mode .step-item .step-title-text { pointer-events: none; }
+  .selection-mode .step-item { cursor: default; }
+  .selection-mode .step-item:hover { background: transparent; }
+  .selection-mode .step-item.active { background: var(--primary-soft); }
+  .selection-mode .ps-title-input, .selection-mode .step-title-input, .selection-mode .interaction-row, .selection-mode .ps-header { pointer-events: none; }
+  .selection-mode .vis-tag { pointer-events: none; }
+
+  .select-cb { width: 18px; height: 18px; border: 1.5px solid var(--border-strong); border-radius: 4px; background: white; cursor: pointer; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; pointer-events: auto !important; transition: background-color .12s, border-color .12s; position: relative; }
+  .select-cb.checked { background: var(--primary); border-color: var(--primary); }
+  .select-cb.checked::after { content: ''; width: 5px; height: 9px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg) translateY(-1px); }
+  .select-cb.indeterminate { background: var(--primary); border-color: var(--primary); }
+  .select-cb.indeterminate::after { content: ''; width: 9px; height: 2px; background: white; border-radius: 1px; }
+  .select-cb.disabled { background: var(--surface-2); border-color: var(--border); cursor: not-allowed; opacity: .55; pointer-events: none !important; }
+  .select-cb.disabled.checked { background: var(--primary-soft); border-color: var(--primary); opacity: .7; }
+  .select-cb.disabled.checked::after { border-color: var(--primary); }
+
+  /* Selection mode toolbar variant */
+  .floating-toolbar.selection-toolbar { padding: 10px; gap: 10px; }
+  .floating-toolbar.selection-toolbar button { width: auto; height: auto; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+  .floating-toolbar.selection-toolbar button.tb-primary { background: var(--primary); color: white; }
+  .floating-toolbar.selection-toolbar button.tb-primary:hover { background: var(--primary-strong); color: white; }
+  .floating-toolbar.selection-toolbar button.tb-primary[disabled] { opacity: .45; cursor: not-allowed; }
+  .floating-toolbar.selection-toolbar button.tb-secondary { background: white; color: var(--text); border: 1px solid var(--border-strong); }
+  .floating-toolbar.selection-toolbar button.tb-secondary:hover { background: var(--bg); color: var(--text); }
   .demo-toast.show { opacity: 1; }
 
   /* Confirm dialog */
@@ -518,7 +556,7 @@
   <button data-tip="Add interaction"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17.5h7M17.5 14v7"/></svg></button>
   <button data-tip="Add process step"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12"/><path d="M4 8h16"/><rect x="2" y="11" width="12" height="9" rx="1.5"/><circle cx="18.5" cy="17.5" r="4"/><path d="M18.5 15.5v4M16.5 17.5h4"/></svg></button>
   <button data-tip="Add pictogram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></button>
-  <button data-tip="Select multiple"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 4-9 4-9-4 9-4z"/><path d="m3 12 9 4 9-4"/><path d="m3 17 9 4 9-4"/></svg></button>
+  <button data-tip="Select multiple" data-action="start-selection-mode"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 4-9 4-9-4 9-4z"/><path d="m3 12 9 4 9-4"/><path d="m3 17 9 4 9-4"/></svg></button>
 </div>
 
 <!-- Global tooltip (used for vis-tag rule descriptions) -->
@@ -600,6 +638,8 @@ let state = {
   moduleMenus: {},
   stepMenus: {},
   expandedInteractions: {},
+  selectionMode: { active: false, selected: null }, // selected is a Set when active
+  bulkDraft: null,
 };
 
 const data = {
@@ -899,6 +939,9 @@ function navigateToIndex(idx) {
 }
 
 function findElement(id) {
+  if (id === '__bulk__' && state.bulkDraft) {
+    return { kind: 'bulk', element: state.bulkDraft };
+  }
   for (const step of data.steps) {
     if (step.id === id) return { kind: 'step', step, parent: null, element: step };
     for (const ps of step.processSteps) {
@@ -1065,8 +1108,20 @@ function render() {
     </div>
   `;
   const toolbar = document.getElementById('floatingToolbar');
+  if (!window.__originalToolbarHTML) window.__originalToolbarHTML = toolbar.innerHTML;
   toolbar.classList.toggle('hidden', state.activeTab !== 'steps');
   toolbar.classList.toggle('module-mode', !!state.activeModuleId);
+  toolbar.classList.toggle('selection-toolbar', state.selectionMode.active);
+  if (state.selectionMode.active) {
+    const count = state.selectionMode.selected ? state.selectionMode.selected.size : 0;
+    toolbar.innerHTML = `
+      <button class="tb-secondary" data-action="cancel-selection-mode">Cancel</button>
+      <button class="tb-primary" data-action="set-visibility-bulk" ${count === 0 ? 'disabled' : ''}>Set visibility (${count})</button>
+    `;
+  } else if (toolbar.querySelector('.tb-secondary, .tb-primary')) {
+    toolbar.innerHTML = window.__originalToolbarHTML;
+  }
+  document.getElementById('app').classList.toggle('selection-mode', state.selectionMode.active);
   renderDrawer();
   renderPreviewModal();
   attachEvents();
@@ -1203,6 +1258,7 @@ function renderActiveStep() {
   if (!step) return '<div style="padding:40px;color:var(--text-mute)">No step selected.</div>';
   return `
     <div class="step-header-card">
+      ${renderSelectCheckbox(step.id)}
       <input class="step-title-input" value="${escape(step.title)}" data-action="rename-step" data-step-id="${step.id}" />
       ${renderVisTag(step)}
     </div>
@@ -1247,6 +1303,7 @@ function renderProcessStep(ps, num) {
   return `
     <div class="process-step-card">
       <div class="ps-header">
+        ${renderSelectCheckbox(ps.id)}
         <span class="ps-num">${num}</span>
         <input class="ps-title-input" value="${escape(ps.title)}" />
         ${renderVisTag(ps)}
@@ -1286,6 +1343,7 @@ function renderInteraction(ix) {
   return `
     <div class="interaction-row ${expanded ? 'expanded' : ''}">
       <div class="interaction-row-main">
+        ${renderSelectCheckbox(ix.id)}
         <span class="interaction-icon">${icon}</span>
         <span class="interaction-label">${escape(ix.label)}</span>
         <div class="interaction-controls">
@@ -1326,6 +1384,24 @@ function checkboxPill(label, checked, purple) {
   if (checked) cls.push('checked');
   if (checked && purple) cls.push('checked-purple');
   return `<label class="${cls.join(' ')}"><input type="checkbox" ${checked ? 'checked' : ''}/> ${label}</label>`;
+}
+
+// ===== Selection checkbox =====
+function renderSelectCheckbox(elementId) {
+  if (!state.selectionMode.active) return '';
+  const sel = state.selectionMode.selected;
+  const f = findElement(elementId);
+  if (!f || f.inModule) return ''; // No checkboxes on module content
+  const isInherited = f.element && f.element.visibility && f.element.visibility.type === 'inherited';
+  const checked = sel && sel.has(elementId);
+  const indet = !checked && hasDescendantInSelected(elementId);
+  const classes = ['select-cb'];
+  if (checked) classes.push('checked');
+  else if (indet) classes.push('indeterminate');
+  if (isInherited) classes.push('disabled');
+  const action = isInherited ? '' : `data-action="select-toggle" data-target-id="${elementId}"`;
+  const tip = isInherited ? 'data-tip="Select the parent — this element follows it"' : '';
+  return `<span class="${classes.join(' ')}" ${action} ${tip}></span>`;
 }
 
 // ===== Visibility tag =====
@@ -1901,6 +1977,51 @@ function attachEvents() {
     el.onclick = () => { state.activeTab = el.dataset.tab; render(); };
   });
 
+  // ----- Selection mode -----
+  document.querySelectorAll('[data-action="start-selection-mode"]').forEach(el => {
+    el.onclick = () => {
+      state.selectionMode = { active: true, selected: new Set() };
+      render();
+      toast('Tap elements to select. Modules and inherited items follow their parent.');
+    };
+  });
+  document.querySelectorAll('[data-action="cancel-selection-mode"]').forEach(el => {
+    el.onclick = () => {
+      state.selectionMode = { active: false, selected: null };
+      render();
+    };
+  });
+  document.querySelectorAll('[data-action="select-toggle"]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const id = el.dataset.targetId;
+      if (!state.selectionMode.selected) return;
+      if (state.selectionMode.selected.has(id)) selectionRemoveCascade(id);
+      else selectionAddCascade(id);
+      renderPreservingScroll();
+    };
+  });
+  document.querySelectorAll('[data-action="set-visibility-bulk"]').forEach(el => {
+    el.onclick = () => {
+      if (!state.selectionMode.selected || state.selectionMode.selected.size === 0) return;
+      const proceed = () => {
+        state.bulkDraft = { id: '__bulk__', visibility: { type: 'conditional', rules: [
+          { id: uid('r'), classifier: 'Location', values: [], notShow: false },
+        ] } };
+        state.drawer = { open: true, targetId: '__bulk__', readOnly: false, openAddClassifier: null, openOperator: null, draftMode: true, draftSnapshot: null, bulkMode: true };
+        render();
+      };
+      if (selectionHasElementsWithRules()) {
+        showConfirm({
+          title: 'Overwrite existing visibility logic?',
+          message: 'Some of the selected elements already have visibility logic. Continuing will replace their existing rules. Continue?',
+          confirmLabel: 'Continue',
+          onConfirm: proceed,
+        });
+      } else proceed();
+    };
+  });
+
   document.querySelectorAll('[data-action="select-step"]').forEach(el => {
     el.onclick = () => {
       state.activeStepId = el.dataset.stepId;
@@ -1958,6 +2079,13 @@ function attachEvents() {
   });
 
   function closeDrawerWithDraftRevert() {
+    if (state.drawer.bulkMode) {
+      // Discard draft; remain in selection mode so user can adjust and try again.
+      state.bulkDraft = null;
+      state.drawer = { open: false, targetId: null, readOnly: false, openAddClassifier: null, openOperator: null, draftMode: false, draftSnapshot: null };
+      renderPreservingScroll();
+      return;
+    }
     if (state.drawer.draftMode && state.drawer.draftSnapshot) {
       const f = findElement(state.drawer.targetId);
       if (f) f.element.visibility = state.drawer.draftSnapshot;
@@ -2252,6 +2380,16 @@ function attachEvents() {
 
   document.querySelectorAll('[data-action="save-drawer"]').forEach(el => {
     el.onclick = () => {
+      if (state.drawer.bulkMode && state.bulkDraft) {
+        const count = state.selectionMode.selected ? state.selectionMode.selected.size : 0;
+        applyBulkRules(state.bulkDraft.visibility.rules || []);
+        state.bulkDraft = null;
+        state.selectionMode = { active: false, selected: null };
+        state.drawer = { open: false, targetId: null, readOnly: false, openAddClassifier: null, openOperator: null, draftMode: false, draftSnapshot: null };
+        render();
+        toast(`Visibility logic applied to ${count} element${count===1?'':'s'}`);
+        return;
+      }
       state.drawer.draftMode = false;
       state.drawer.draftSnapshot = null;
       state.drawer.open = false;
@@ -2561,6 +2699,10 @@ function findOpById(opId) {
     if (v.extraRules) arr.push(...v.extraRules);
     return arr;
   };
+  if (state.bulkDraft) {
+    const op = collect(state.bulkDraft.visibility).find(r => r.id === opId && r.op);
+    if (op) return op;
+  }
   const allSteps = [...data.steps, ...data.modules.filter(m => m.step).map(m => m.step)];
   for (const step of allSteps) {
     let op = collect(step.visibility).find(r => r.id === opId && r.op);
@@ -2586,6 +2728,11 @@ function findRule(ruleId) {
     if (v.extraRules) arr.push(...v.extraRules);
     return arr;
   };
+  // Bulk draft rules
+  if (state.bulkDraft) {
+    const r = collect(state.bulkDraft.visibility).find(r => r.id === ruleId);
+    if (r) return r;
+  }
   const allSteps = [...data.steps, ...data.modules.filter(m => m.step).map(m => m.step)];
   for (const step of allSteps) {
     let r = collect(step.visibility).find(r => r.id === ruleId);
@@ -2605,6 +2752,7 @@ function findRule(ruleId) {
 function deleteRule(ruleId) {
   // Look in both v.rules (conditional) and v.extraRules (inherited extras).
   const allVis = [];
+  if (state.bulkDraft && state.bulkDraft.visibility) allVis.push(state.bulkDraft.visibility);
   const allSteps = [...data.steps, ...data.modules.filter(m => m.step).map(m => m.step)];
   for (const step of allSteps) {
     if (step.visibility) allVis.push(step.visibility);
@@ -2718,6 +2866,125 @@ function clearDescendantRules(element) {
         return;
       }
     }
+  }
+}
+
+// ===== Selection mode helpers =====
+function getElementParentId(elementId) {
+  for (const step of data.steps) {
+    if (step.id === elementId) return null;
+    for (const ps of step.processSteps) {
+      if (ps.id === elementId) return step.id;
+      for (const ix of ps.interactions) if (ix.id === elementId) return ps.id;
+    }
+  }
+  return null;
+}
+
+function getDirectChildIds(elementId) {
+  for (const step of data.steps) {
+    if (step.id === elementId) return step.processSteps.map(ps => ps.id);
+    for (const ps of step.processSteps) {
+      if (ps.id === elementId) return ps.interactions.map(ix => ix.id);
+    }
+  }
+  return [];
+}
+
+function getAllDescendantIds(elementId) {
+  const out = [];
+  for (const step of data.steps) {
+    if (step.id === elementId) {
+      for (const ps of step.processSteps) {
+        out.push(ps.id);
+        for (const ix of ps.interactions) out.push(ix.id);
+      }
+      return out;
+    }
+    for (const ps of step.processSteps) {
+      if (ps.id === elementId) {
+        for (const ix of ps.interactions) out.push(ix.id);
+        return out;
+      }
+    }
+  }
+  return out;
+}
+
+function hasDescendantInSelected(elementId) {
+  if (!state.selectionMode.selected) return false;
+  return getAllDescendantIds(elementId).some(id => state.selectionMode.selected.has(id));
+}
+
+function selectionAddCascade(elementId) {
+  const sel = state.selectionMode.selected;
+  sel.add(elementId);
+  for (const id of getAllDescendantIds(elementId)) sel.add(id);
+  // Walk up: if all siblings of cur are selected, add parent
+  let curId = elementId;
+  while (true) {
+    const parentId = getElementParentId(curId);
+    if (!parentId) break;
+    const directChildren = getDirectChildIds(parentId);
+    if (directChildren.length && directChildren.every(id => sel.has(id))) {
+      sel.add(parentId);
+      curId = parentId;
+    } else break;
+  }
+}
+
+function selectionRemoveCascade(elementId) {
+  const sel = state.selectionMode.selected;
+  sel.delete(elementId);
+  for (const id of getAllDescendantIds(elementId)) sel.delete(id);
+  // Walk up: remove all ancestors (they're no longer fully selected)
+  let curId = elementId;
+  while (true) {
+    const parentId = getElementParentId(curId);
+    if (!parentId) break;
+    sel.delete(parentId);
+    curId = parentId;
+  }
+}
+
+function selectionTopLevelIds() {
+  // Top-level selected = elements whose parent is NOT in the selection
+  const sel = state.selectionMode.selected;
+  const out = [];
+  for (const id of sel) {
+    const parentId = getElementParentId(id);
+    if (!parentId || !sel.has(parentId)) out.push(id);
+  }
+  return out;
+}
+
+function selectionHasElementsWithRules() {
+  if (!state.selectionMode.selected) return false;
+  for (const id of state.selectionMode.selected) {
+    const f = findElement(id);
+    if (!f) continue;
+    const v = f.element.visibility;
+    if (v && (v.type === 'conditional' || v.type === 'inherited' || v.type === 'governed')) {
+      // Only "real" logic counts — inherited via parent in selection isn't an "existing rule"
+      // For confirmation purposes, treat anything not 'always' as having rules.
+      if (v.type !== 'always') return true;
+    }
+  }
+  return false;
+}
+
+function applyBulkRules(rulesTemplate) {
+  const tops = selectionTopLevelIds();
+  for (const id of tops) {
+    const f = findElement(id);
+    if (!f) continue;
+    f.element.visibility = {
+      type: 'conditional',
+      rules: rulesTemplate.map(r => {
+        if (r.op) return { id: uid('op'), op: r.op };
+        return { id: uid('r'), classifier: r.classifier, values: [...r.values], notShow: !!r.notShow };
+      }),
+    };
   }
 }
 
