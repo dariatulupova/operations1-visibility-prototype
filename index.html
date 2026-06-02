@@ -373,7 +373,9 @@
   }
   .add-icon-btn[data-tip]:hover::after,
   .add-icon-btn[data-tip]:hover::before { opacity: 1; }
-  .apply-all-row { text-align: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .apply-all-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px; }
+  .apply-all-row::before, .apply-all-row::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .apply-all-row a { color: var(--primary); font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; letter-spacing: .3px; cursor: pointer; }
 
   /* ===== Modules tab ===== */
   .modules-layout { padding: 22px 28px; overflow-y: auto; height: calc(100vh - 130px); }
@@ -1637,9 +1639,11 @@ function renderDrawer() {
   if (v.type === 'conditional') {
     logicHtml = renderConditionalEditor(v.rules);
   } else if (v.type === 'inherited') {
-    // Always derive the displayed rules from the parent live, so parent changes propagate.
-    const owner = findVisibilityOwner(el);
-    const inheritedFrom = owner ? owner.element : null;
+    // Always derive the displayed rules from the immediate parent live, so any parent change
+    // (its own rules OR its extras when it's itself inherited) propagates down.
+    const parentId = getElementParentId(el.id);
+    const parentF = parentId ? findElement(parentId) : null;
+    const inheritedFrom = parentF ? parentF.element : null;
     const header = inheritedFrom
       ? `<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">Inherited from ${elementKindLabel(inheritedFrom)}: <strong>${escape(inheritedFrom.title || inheritedFrom.label)}</strong></div>`
       : '';
@@ -2672,22 +2676,30 @@ function attachEvents() {
 }
 
 // For inherited elements, derive the effective rules on demand by combining
-// the parent's current rules (read fresh each call) with this element's
-// narrowed values and extra rules. This way any change to the parent's logic
-// is automatically reflected in the child.
+// the immediate parent's effective rules (which itself may be inherited + extras)
+// with this element's narrowed values and extra rules. This way any change to
+// any ancestor's logic — including extras the parent added on top of its own
+// inheritance — cascades down to all descendants.
 function buildEffectiveRules(element) {
   const v = element.visibility;
   if (!v) return [];
   if (v.type === 'conditional') return v.rules || [];
   if (v.type !== 'inherited') return [];
-  const owner = findVisibilityOwner(element);
   const narrowed = v.narrowed || {};
   const extraRules = v.extraRules || [];
-  if (!owner || !owner.element.visibility || owner.element.visibility.type !== 'conditional') {
-    return extraRules;
+  // Look at the IMMEDIATE parent so we pick up any extras the parent added.
+  const parentId = getElementParentId(element.id);
+  let parentEffective = [];
+  if (parentId) {
+    const parentF = findElement(parentId);
+    if (parentF && parentF.element && parentF.element.visibility) {
+      const pv = parentF.element.visibility;
+      if (pv.type === 'conditional') parentEffective = pv.rules || [];
+      else if (pv.type === 'inherited') parentEffective = buildEffectiveRules(parentF.element);
+    }
   }
-  const parentRules = owner.element.visibility.rules;
-  const effective = parentRules.map(r => {
+  if (!parentEffective.length) return extraRules;
+  const effective = parentEffective.map(r => {
     if (r.op) return { id: 'inh-op-' + r.id, op: r.op, locked: true };
     return {
       id: 'inh-rule-' + r.id,
