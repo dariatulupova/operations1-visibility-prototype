@@ -267,7 +267,7 @@
   .class-card-row { display: flex; gap: 8px; align-items: flex-start; }
   .class-card-select { flex: 1; position: relative; }
   .class-card-select label { position: absolute; top: -7px; left: 10px; background: white; padding: 0 4px; font-size: 11px; line-height: 1; color: var(--text-mute); z-index: 2; }
-  .class-card-select select { width: 100%; padding: 12px 12px 8px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 13px; appearance: none; background: white url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236a7282' viewBox='0 0 16 16'><path d='M4 6l4 4 4-4'/></svg>") no-repeat right 8px center; }
+  .class-card-select select { width: 100%; padding: 12px 36px 8px 12px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 13px; appearance: none; background: white url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236a7282' viewBox='0 0 16 16'><path d='M4 6l4 4 4-4'/></svg>") no-repeat right 14px center; }
   .class-card-del { width: 36px; height: 36px; border-radius: 6px; color: var(--text-mute); display: inline-flex; align-items: center; justify-content: center; }
   .class-card-del:hover { background: var(--bg); }
 
@@ -329,6 +329,7 @@
   .field { position: relative; }
   .field label { position: absolute; top: -8px; left: 10px; background: white; padding: 0 4px; font-size: 11px; color: var(--text-mute); }
   .field input, .field select, .field textarea { width: 100%; padding: 12px 12px 10px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 13px; outline: none; background: white; }
+  .field select { appearance: none; padding-right: 36px; background: white url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236a7282' viewBox='0 0 16 16'><path d='M4 6l4 4 4-4'/></svg>") no-repeat right 14px center; }
   .field.full { grid-column: 1 / -1; }
   .field textarea { resize: vertical; min-height: 56px; }
   .checks-row { display: flex; gap: 18px; margin-top: 24px; }
@@ -430,7 +431,7 @@
   .pref-row label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
   .pref-row .clear-link { color: var(--primary); font-weight: 700; font-size: 11px; letter-spacing: .5px; }
   .pref-classifier { margin-bottom: 10px; position: relative; }
-  .pref-classifier select { width: 100%; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 13px; background: white; appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236a7282' viewBox='0 0 16 16'><path d='M4 6l4 4 4-4'/></svg>"); background-repeat: no-repeat; background-position: right 8px center; }
+  .pref-classifier select { width: 100%; padding: 10px 36px 10px 12px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 13px; background: white; appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236a7282' viewBox='0 0 16 16'><path d='M4 6l4 4 4-4'/></svg>"); background-repeat: no-repeat; background-position: right 14px center; }
   .pref-classifier-label { position: absolute; top: -7px; left: 10px; background: white; padding: 0 4px; font-size: 10px; color: var(--text-mute); }
   .pref-classifier-disabled { opacity: .45; pointer-events: none; }
 
@@ -507,7 +508,7 @@
 
   .select-cb { width: 18px; height: 18px; border: 1.5px solid var(--border-strong); border-radius: 4px; background: white; cursor: pointer; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; pointer-events: auto !important; transition: background-color .12s, border-color .12s; position: relative; }
   .select-cb.checked { background: var(--primary); border-color: var(--primary); }
-  .select-cb.checked::after { content: ''; width: 5px; height: 9px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg) translateY(-1px); }
+  .select-cb.checked::after { content: ''; position: absolute; top: 50%; left: 50%; width: 5px; height: 9px; border: solid white; border-width: 0 2px 2px 0; transform: translate(-50%, -60%) rotate(45deg); }
   .select-cb.indeterminate { background: var(--primary); border-color: var(--primary); }
   .select-cb.indeterminate::after { content: ''; width: 9px; height: 2px; background: white; border-radius: 1px; }
   .select-cb.disabled { background: var(--surface-2); border-color: var(--border); cursor: not-allowed; opacity: .55; pointer-events: none !important; }
@@ -638,7 +639,7 @@ let state = {
   activeStepId: 's1',
   activeModuleId: null,
   drawer: { open: false, targetId: null, readOnly: false, openAddClassifier: null, openOperator: null, draftMode: false, draftSnapshot: null },
-  preview: { open: false, classifierSelections: {}, onlyConnected: true, responses: {}, classifiersPanelOpen: true },
+  preview: { open: false, classifierSelections: {}, onlyConnected: true, responses: {}, classifiersPanelOpen: false },
   moduleMenus: {},
   stepMenus: {},
   expandedInteractions: {},
@@ -1080,7 +1081,9 @@ function normalizeVisibilityInheritance() {
     const stepHasRules = step.visibility && step.visibility.type === 'conditional';
     for (const ps of step.processSteps) {
       if (stepHasRules) {
-        if (!ps.visibility || ps.visibility.type === 'always') ps.visibility = { type: 'inherited' };
+        // Force inherit when step has rules — even if PS had its own conditional rules,
+        // those rules cascade down from the step and override any PS-specific rules.
+        if (!ps.visibility || ps.visibility.type !== 'inherited') ps.visibility = { type: 'inherited' };
       } else if (ps.visibility && ps.visibility.type === 'inherited') {
         ps.visibility = { type: 'always' };
       }
@@ -1088,7 +1091,9 @@ function normalizeVisibilityInheritance() {
       const ancestorHasRules = psHasRules || stepHasRules;
       for (const ix of ps.interactions) {
         if (ancestorHasRules) {
-          if (!ix.visibility || ix.visibility.type === 'always') ix.visibility = { type: 'inherited' };
+          // Force inherit when an ancestor has rules; preserve 'governed' interactions.
+          if (!ix.visibility) ix.visibility = { type: 'inherited' };
+          else if (ix.visibility.type !== 'inherited' && ix.visibility.type !== 'governed') ix.visibility = { type: 'inherited' };
         } else if (ix.visibility && ix.visibility.type === 'inherited') {
           ix.visibility = { type: 'always' };
         }
@@ -1512,7 +1517,7 @@ function renderInfoTab() {
       </div>
       <div class="info-card">
         <h4>QR-Codes</h4>
-        <a>${ICONS.plus} Add QR-code</a>
+        <a style="display:inline-flex;align-items:center;gap:6px">${ICONS.plus} Add QR-code</a>
       </div>
       <div class="info-card">
         <h4>Structure classes</h4>
@@ -2425,7 +2430,11 @@ function attachEvents() {
   });
 
   document.querySelectorAll('[data-action="open-preview"]').forEach(el => {
-    el.onclick = () => { state.preview.open = true; renderPreviewModal(); };
+    el.onclick = () => {
+      state.preview.open = true;
+      state.preview.classifiersPanelOpen = false;
+      renderPreviewModal();
+    };
   });
   document.querySelectorAll('[data-action="close-preview"]').forEach(el => {
     el.onclick = () => { state.preview.open = false; renderPreviewModal(); };
