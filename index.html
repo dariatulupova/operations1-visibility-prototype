@@ -513,7 +513,8 @@
   .select-cb.checked::after { content: ''; position: absolute; top: 50%; left: 50%; width: 5px; height: 9px; border: solid white; border-width: 0 2px 2px 0; transform: translate(-50%, -60%) rotate(45deg); }
   .select-cb.indeterminate { background: var(--primary); border-color: var(--primary); }
   .select-cb.indeterminate::after { content: ''; width: 9px; height: 2px; background: white; border-radius: 1px; }
-  .select-cb.disabled { background: var(--surface-2); border-color: var(--border); cursor: not-allowed; opacity: .55; pointer-events: none !important; }
+  .select-cb.disabled { background: var(--surface-2); border-color: var(--border); cursor: not-allowed; opacity: .55; }
+  .select-cb.disabled::after { content: none; }
   .select-cb.disabled.checked { background: var(--primary-soft); border-color: var(--primary); opacity: .7; }
   .select-cb.disabled.checked::after { border-color: var(--primary); }
 
@@ -3185,7 +3186,7 @@ function flipModuleMenusIfNeeded() {
 function attachVisTagTooltips() {
   const tooltip = document.getElementById('globalTooltip');
   if (!tooltip) return;
-  document.querySelectorAll('.vis-tag.conditional[data-tip]').forEach(el => {
+  const bind = (el) => {
     el.addEventListener('mouseenter', () => {
       tooltip.textContent = el.dataset.tip || '';
       tooltip.classList.add('show');
@@ -3195,7 +3196,9 @@ function attachVisTagTooltips() {
       tooltip.classList.remove('show');
       tooltip.style.transform = 'translate(-9999px, -9999px)';
     });
-  });
+  };
+  document.querySelectorAll('.vis-tag.conditional[data-tip]').forEach(bind);
+  document.querySelectorAll('.select-cb.disabled[data-tip]').forEach(bind);
 }
 
 function positionTooltip(target, tooltip) {
