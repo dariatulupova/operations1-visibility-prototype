@@ -796,11 +796,12 @@ const data = {
   modules: [
     { id: 'm1', position: 2, name: 'Calibration routine', version: 'newest version 1.0', readOnly: true,
       classifiers: { Department: ['E4573', 'Y5688'], Location: ['Amsterdam', 'Munich'] },
+      visibility: { type: 'conditional', rules: [
+        { id: uid('r'), classifier: 'Business Unit', values: ['Industrial', 'Consumer'], notShow: false },
+      ]},
       step: {
         id: 'm1-step', title: 'Calibration setup',
-        visibility: { type: 'conditional', rules: [
-          { id: uid('r'), classifier: 'Business Unit', values: ['Industrial', 'Consumer'], notShow: false },
-        ]},
+        visibility: { type: 'always' },
         processSteps: [
           {
             id: 'm1-ps-1', title: 'Prepare calibration jig',
@@ -808,8 +809,12 @@ const data = {
             attachments: [],
             interactions: [
               { id: 'm1-ix-1', type: 'check', label: 'Position jig on workbench', mandatory: true, visibility: { type: 'always' } },
-              { id: 'm1-ix-2', type: 'thumbsUp', label: 'Is the reference plate aligned?', mandatory: true, response: 'OK', criticality: 'High', visibility: { type: 'always' } },
-              { id: 'm1-ix-3', type: 'hash', label: 'Ambient temperature (°C)', mandatory: true, visible: true, visibility: { type: 'always' } },
+              { id: 'm1-ix-2', type: 'thumbsUp', label: 'Is the reference plate aligned?', mandatory: true, response: 'OK', criticality: 'High', visibility: { type: 'conditional', rules: [
+                { id: uid('r'), classifier: 'Department', values: ['E4573', 'Y5688'], notShow: false },
+              ]} },
+              { id: 'm1-ix-3', type: 'hash', label: 'Ambient temperature (°C)', mandatory: true, visible: true, visibility: { type: 'conditional', rules: [
+                { id: uid('r'), classifier: 'Location', values: ['Amsterdam', 'Munich'], notShow: false },
+              ]} },
             ],
           },
           {
@@ -828,13 +833,13 @@ const data = {
       classifiers: { Material: ['Steel', 'Aluminum'] },
       step: {
         id: 'm2-step', title: 'Safety lockout',
-        visibility: { type: 'conditional', rules: [
-          { id: uid('r'), classifier: 'Device type', values: ['Robot arm', 'CNC', 'Press'], notShow: false },
-        ]},
+        visibility: { type: 'always' },
         processSteps: [
           {
             id: 'm2-ps-1', title: 'Isolate power sources',
-            visibility: { type: 'always' }, attachments: [],
+            visibility: { type: 'conditional', rules: [
+              { id: uid('r'), classifier: 'Device type', values: ['Robot arm', 'CNC', 'Press'], notShow: false },
+            ]}, attachments: [],
             interactions: [
               { id: 'm2-ix-1', type: 'check', label: 'Switch main disconnect to OFF', mandatory: true, visibility: { type: 'always' } },
               { id: 'm2-ix-2', type: 'check', label: 'Apply personal lockout tag', mandatory: true, visibility: { type: 'always' } },
@@ -889,16 +894,16 @@ const data = {
       classifiers: { Module: ['M2'] },
       step: {
         id: 'm4-step', title: 'Sub-assembly inspection',
-        visibility: { type: 'conditional', rules: [
-          { id: uid('r'), classifier: 'Production area', values: ['Line A', 'Line B'], notShow: false },
-        ]},
+        visibility: { type: 'always' },
         processSteps: [
           {
             id: 'm4-ps-1', title: 'Visual sub-assembly check',
             visibility: { type: 'always' }, attachments: [],
             interactions: [
               { id: 'm4-ix-1', type: 'thumbsUp', label: 'All connectors fully seated?', mandatory: true, response: 'OK', criticality: 'High', visibility: { type: 'always' } },
-              { id: 'm4-ix-2', type: 'check', label: 'No visible damage to PCB', mandatory: true, visibility: { type: 'always' } },
+              { id: 'm4-ix-2', type: 'check', label: 'No visible damage to PCB', mandatory: true, visibility: { type: 'conditional', rules: [
+                { id: uid('r'), classifier: 'Production area', values: ['Line A', 'Line B'], notShow: false },
+              ]} },
               { id: 'm4-ix-3', type: 'list', label: 'Inspection result', mandatory: true, dropdown: false, single: true, visibility: { type: 'always' } },
             ],
           },
@@ -959,6 +964,7 @@ function findElement(id) {
     }
   }
   for (const m of data.modules) {
+    if (m.id === id) return { kind: 'module', module: m, element: m };
     if (!m.step) continue;
     if (m.step.id === id) return { kind: 'step', step: m.step, parent: null, element: m.step, inModule: m };
     for (const ps of m.step.processSteps) {
@@ -1062,6 +1068,9 @@ function summarizeRules(element, rules) {
 }
 
 function elementKindLabel(element) {
+  for (const m of data.modules) {
+    if (m.id === element.id) return 'module';
+  }
   const allSteps = [...data.steps, ...data.modules.filter(m => m.step).map(m => m.step)];
   for (const s of allSteps) {
     if (s.id === element.id) return 'step';
@@ -2631,8 +2640,9 @@ function attachEvents() {
       if (!m || !m.step) { renderPreservingScroll(); return; }
       state.activeModuleId = id;
       state.activeStepId = null;
-      // Open drawer for the module's step, read-only
-      state.drawer = { open: true, targetId: m.step.id, readOnly: true, openAddClassifier: null, openOperator: null, draftMode: false };
+      // Open drawer for the module itself when it has its own visibility, otherwise fall back to the inner step
+      const targetId = m.visibility ? m.id : m.step.id;
+      state.drawer = { open: true, targetId, readOnly: true, openAddClassifier: null, openOperator: null, draftMode: false };
       renderPreservingScroll({ resetMain: true });
     };
   });
@@ -2919,7 +2929,8 @@ function clearDescendantRules(element) {
 
 // ===== Selection mode helpers =====
 function getElementParentId(elementId) {
-  for (const step of data.steps) {
+  const roots = [...data.steps, ...data.modules.filter(m => m.step).map(m => m.step)];
+  for (const step of roots) {
     if (step.id === elementId) return null;
     for (const ps of step.processSteps) {
       if (ps.id === elementId) return step.id;
