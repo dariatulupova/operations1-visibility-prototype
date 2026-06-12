@@ -1687,7 +1687,7 @@ function renderDrawer() {
       ${bodyTop}
       ${(!isReadOnlyType && v.type !== 'inherited') ? `
         <div class="drawer-top-row">
-          <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" checked /> Only connected classifiers</label>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px${state.drawer.readOnly ? ';opacity:.6;cursor:not-allowed' : ''}"><input type="checkbox" checked ${state.drawer.readOnly ? 'disabled' : ''}/> Only connected classifiers</label>
           <button class="danger-link" data-action="delete-logic">DELETE LOGIC</button>
         </div>
       ` : ''}
@@ -2268,6 +2268,57 @@ function attachEvents() {
     el.onclick = () => {
       const rule = findRule(el.dataset.ruleId);
       if (rule && rule.locked) return;
+
+      // If removing this rule would empty the current step/PS's own logic AND it has descendants
+      // inheriting from it, route through the same cascade confirmation as DELETE LOGIC so the
+      // user is aware the change affects dependent elements.
+      const drawerF = findElement(state.drawer.targetId);
+      const v = drawerF && drawerF.element && drawerF.element.visibility;
+      const ownsRule = v && v.type === 'conditional' && v.rules && v.rules.some(r => r.id === el.dataset.ruleId);
+      const wouldEmpty = ownsRule && v.rules.filter(r => !r.op).length === 1;
+      const hasInherited = drawerF && (
+        drawerF.kind === 'processStep'
+          ? drawerF.element.interactions.some(ix => ix.visibility && ix.visibility.type === 'inherited')
+          : drawerF.kind === 'step'
+            ? drawerF.element.processSteps.some(ps => ps.visibility && ps.visibility.type === 'inherited')
+            : false
+      );
+
+      if (wouldEmpty && hasInherited) {
+        if (drawerF.kind === 'processStep') {
+          showConfirm({
+            title: 'Delete visibility logic from process step?',
+            message: 'This is the last class on this process step. Removing it will affect interactions that inherit from it. How would you like to proceed?',
+            confirmLabel: 'Confirm',
+            defaultChoiceIndex: 1,
+            choices: [
+              { value: 'all', label: 'Delete from all interactions', description: 'Visibility logic will be deleted from the process step and all interactions inside. All interactions will become "Always visible".' },
+              { value: 'keep', label: 'Keep on interactions', description: 'Visibility logic will be deleted from the process step, but each interaction will keep its current logic. You can edit them individually.' },
+            ],
+            onConfirm: (choice) => {
+              deleteLogicFromProcessStep(drawerF.element, choice);
+              renderPreservingScroll();
+            },
+          });
+        } else {
+          showConfirm({
+            title: 'Delete visibility logic from step?',
+            message: 'This is the last class on this step. Removing it will affect process steps and interactions that inherit from it. How would you like to proceed?',
+            confirmLabel: 'Confirm',
+            defaultChoiceIndex: 1,
+            choices: [
+              { value: 'all', label: 'Delete from all process steps and interactions', description: 'Visibility logic will be deleted from the step and everything inside. All elements will become "Always visible".' },
+              { value: 'keep', label: 'Keep on process steps and interactions', description: 'Visibility logic will be deleted from the step, but each process step and interaction will keep its current logic. You can edit them individually.' },
+            ],
+            onConfirm: (choice) => {
+              deleteLogicFromStep(drawerF.element, choice);
+              renderPreservingScroll();
+            },
+          });
+        }
+        return;
+      }
+
       deleteRule(el.dataset.ruleId);
       renderPreservingScroll();
     };
